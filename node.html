@@ -1,0 +1,293 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <title>Node Library Documentation</title>
+<style type="text/css">
+p { text-indent: 1em }
+</style>
+  </head>
+
+  <body style="margin-left:1em">
+    <h1>Node Library Documentation</h1>
+
+	<h2> Overview </h2>
+	<p>
+	The node library was originally designed to support reverse-engineering the
+	Conductor NT file format.  It has turned into a general-purpose lightweight 
+	collection class with a text-based persistence format.
+
+	<h2> Upgrading From Previous Release </h2>
+	<p>
+	The new Release-build node.dll is binary-compatible with programs built against the old 
+	node library.  This means that you can install a new Release-build node.dll in your Overrides 
+	directory and old versions of programs that use node.dll will still run.  If that is not true,
+	please let us know which programs it is broken for!
+	<p>
+	The new library is not source-compatible with all previous code.  To get your program
+	running with the new library, use the following guide.
+
+	<h3> Install and Build New Node Source Code </h3>
+	<p>
+	As of this writing (August 4, 2006) the new node source code is checked in on the 
+	work branch in CVS.  Check out the node module with <tt>-r work</tt> into a node-work
+	directory parallel to your node directory.
+	<p>
+	To build the unit tests (recommended) you will need to configure the PYTHON environment 
+	variable to point where python is installed on your computer.  (You could also use Perl if 
+	you happen to have perl installed.  Most developer machines have python installed to make WinCVS 
+	work better.  If Python is not installed, get it from <a href="http://www.activestate.org/ASPN/Python">http://www.activestate.org/ASPN/Python</a>.)
+	<p>
+	To configure environment variables, either use the System control panel (Control Panels | System | 
+	Advanced | Environment Variables | System Variables) or edit the registry under
+	[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment]
+	and create a key named PYTHON.  The typical value will be "C:\Program Files\Python24\python.exe". Below is
+	a .reg file which will create the appropriate key for you:<br />
+<pre>
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment]
+"PYTHON"="C:\\Program Files\\Python24\\python.exe"
+</pre>
+    <p>
+	You will also need to check out the unit test framework.  It is in CVS with the module name 'cxxtest'.
+	Node expects it to be checked out into the directory <tt>..\cxxtest</tt>; if you check it out
+	somewhere else, you will need to edit <tt>node-work/Makefile</tt> to reflect the location of cxxtest.
+	<p>
+	Now you can open node-work\node.dsw in Visual Studio.  If you have an existing instance of
+	Visual Studio, you must close and restart it to pick up the new environment variable.
+	Do a Build | Batch Build and select -
+	<ul>
+	 <li> All of the CxxTest_1_Run projects
+	 <li> node - Win32 Release
+	 <li> node - Win32 Debug
+	</ul>
+	Then click "Build".  The node projects will build and (if you have set up Python or Perl), the tests
+	will run.  The tests application with throw up a big progress bar which should remain all-green.
+	<p>
+	Now you have a complete build of the work version of node.
+	
+	<h3> Update Your Projects to use the new Node </h3>
+	<p>
+	Hyperlink-work is already updated at this writing. Other work applications might 
+	be already updated, so do a CVS update before continuing. You only need to follow 
+	these steps if you don't have updated work version.
+	<p>
+	First, edit the Project files and change all the instances of <tt>..\node</tt>, <tt>..\..\node</tt>, etc. to
+	<tt>..\node-work</tt>, <tt>..\..\node-work</tt>, etc.  These are in C/C++ | Preprocessor | Additional include directories
+	and in Link | Input | Additional Library Path or as part of the path to node.lib in Link | Input | Object/library modules.
+	<p>
+	The name of the debug node library is now noded.dll.  This is so you can install the
+	debug node library in Overrides without screwing up all the Release-build programs that rely
+	on the Release library.  You will need to change the name of the library (for your Debug builds <b>only</b>)
+	in the Link | Input | Object/library modules
+	from node.lib to noded.lib.
+	<p>
+	The node structure <tt>struct __node</tt> is no longer exposed in the node.h header.  Direct reference to 
+	structure members is no longer allowed -- e.g., you used to be able to do <tt>pn->nHashElements</tt> and now
+	you must do <tt>node_get_elements( pn )</tt>.  These will come in as compile errors.  In brief, you should change:
+	<ul>
+	  <li> <tt> pn->pnListElements </tt> to <tt> node_get_elements( pn ) </tt>
+	  <li> <tt> pn->pnHashElements </tt> to <tt> node_get_elements( pn ) </tt>
+	  <li> <tt> pn->nType </tt> to <tt> node_get_type( pn ) </tt>
+	</ul>
+	References to other members (e.g., pnListTail) are uncommon.  Usually if they occur, they can be handled
+	by using new API features.
+	<p>
+	Now install the tagged noded.dll in your project's Debug directory and the node.dll in the Overrides directory.
+	Your project should build and run normally, both in the debugger and out.
+
+	<h3> </h3>
+
+	<h2> Old Features of Node </h2>
+
+	<h2> New Features in this Release (2.1) </h2>
+	<p>
+	<ul>
+		<li> <a href="#Unit_Tests">Unit Tests</a>
+		<li> <a href="#NODE_REF">Add-reference semantics for lists and hashes</a>
+		<li> <a href="#debug">Debugging Features</a>
+		<li> <a href="#performance">Various non-user-visible performance changes</a>
+		<li> <a href="#NODE_PTR">New node type for safely storing pointers</a>
+	</ul>
+
+	<h3> <a name="Unit_Tests">Unit Tests</a> </h3>
+	<p>
+	This is the big green bar thing.  Currently the tests assure all of the basic functionality and
+	aim to ensure safety of node operations.  They do not yet cover all exceptional conditions, assertions, etc.
+	<p>
+	Unit tests are implemented in CxxTest, with documentation in the CxxTest directory you checked out in order
+	to build node.  The tests are in <tt>test\BasicNodes.h</tt>
+
+	<h3> <a name="NODE_REF">Add-reference semantics for lists and hashes</a> </h3>
+	<p>
+	In previous versions of node, the only way to store nodes within nodes was by copying.  The typical metaphor
+	for generating a large data structure was:
+	<pre>
+	pnBody = node_hash_alloc();
+	pnRecords = node_list_alloc();
+
+	for( /* all records */ )
+	{
+		node_t * pnRecord = parse_record();
+		node_list_add( pnRecords, NODE_NODE, pnRecord );
+		node_free( pnRecord );
+	}
+
+	node_hash_add( pnBody, "Records", NODE_NODE, pnRecords );
+	node_free( pnRecords );</pre>
+	<p>
+	There is an implicit copy when adding a node to a collection: node_list_add(), node_hash_add() and node_push() 
+	all use the NODE_NODE type to indicate that a copy of the node argument should be added to the collection.
+	<p>
+	Unfortunately node_copy() is very slow, especially when the node to copied contains many other possibly complex
+	nodes (such as the <tt>pnRecords</tt> node in the above example).  And note that we store a copy of the node 
+	in the collection and then immediately free the original.  How wasteful!
+	<p>
+	The new version of node supports a new type for adding to collections: NODE_REF.  This indicates that the
+	node library should not make a copy, but instead add the node argument directly to the collection.  So we can 
+	rewrite our code like this:
+	<pre>
+	pnBody = node_hash_alloc();
+	pnRecords = node_list_alloc();
+
+	for( /* all records */ )
+		node_list_add( pnRecords, NODE_REF, parse_record() );
+
+	node_hash_add( pnBody, "Records", NODE_REF, pnRecords );</pre>
+	<p>
+	The new code is shorter, simpler, and faster.  What's the catch?  It's also more dangerous.  When every node
+	was copied before being added to a collection, it was impossible to create a circular node data structure.
+	With NODE_REF, it is.  With copying, it's not possible to damage a collection by adding one of its members 
+	to a different collection.  With NODE_REF, it is (although there are automated checks which should catch this error.)
+	<p>
+	Furthermore, with NODE_REF, the old reference to the node that is added should be treated 
+	as though node_free() had been called on it.  It would be safest to set it to NULL or to the
+	return value of node_hash_add() than to leave it pointing to the old node storage.  The node
+	implementation <b>does not guarantee</b> that the node passed in with a NODE_REF argument will
+	remain live, merely that the contents of that node (and not a copy) will be stored in the collection.
+	<p>
+	Another API change is that collection adding functions return a reference to the added item.
+	With this and NODE_REF, we can shorted the common idiom for creating an empty list at a particular 
+	place in a hash from:
+	<pre>
+	/* check if the list existed already */
+	pnList = node_hash_get( m_pnHash, psKey );
+	if( pnList == NULL )
+	{
+		/* create the list */
+		pnList = node_list_alloc();
+		node_hash_add( m_pnHash, psKey, NODE_NODE, pnList );
+		node_free( pnList );
+		pnList = node_hash_get( m_pnHash, psKey );
+	}
+	/* now pnList is a reference to the list in the hash */</pre>
+	to the more streamlined version:
+	<pre>
+	/* check if the list existed already */
+	pnList = node_hash_get( m_pnHash, psKey );
+	if( pnList == NULL )
+	{
+		/* create the list */
+		pnList = node_hash_add( m_pnHash, psKey, NODE_REF, node_list_alloc() );
+	}
+	/* now pnList is a reference to the list in the hash */</pre>
+	which (as a bonus) avoids a copy.
+
+	<h3> <a name="debug">Debugging Features</a> </h3>
+	<p>
+	There are three optional debugging features: NODE_DEBUG_INTERN, NODE_DEBUG_UNICODE, and NODE_DEBUG_REF.
+	All are enabled by default in Debug builds of the node library and are disabled by default in Release builds.
+	You can control these features with the api function <tt>node_set_debug( int nDebugMode )</tt>, or query the
+	state of the debugging features with <tt>node_get_debug()</tt>.  Debugging features are not thread-local; they are 
+	enabled or disabled for the whole process.
+	<p>
+	NODE_DEBUG_INTERN turns on extra debugging checks for the intern table, a non-user-visible "optimization" 
+	which is currently disabled.
+	<p>
+	NODE_DEBUG_REF turns on extra checking when <tt>node_list_add()</tt>, <tt>node_hash_add()</tt>, or <tt>node_push()</tt>
+	is called with the new NODE_REF type.  This is an attempt to guard against the creation of double-owned storage 
+	or circular lists.  The following checks are made:
+	<ul>
+	<li> when freeing a node, the node must not be in any collection (list or hash)
+	<li> when adding a node to a collection with NODE_REF, the node is not currently in any collection
+	</ul>
+	This guards against most NODE_REF problems:
+	<pre>
+	node_t * pnHash = node_hash_alloc();
+	node_t * pn = node_alloc();
+	node_set( pn, NODE_INT, 1 );
+	node_hash_add( pnHash, "Test1", NODE_REF, pn ); /* OK */
+	node_free( pn );	/* error caught by NODE_DEBUG_REF - pn was added to hash */
+	node_hash_add( pnHash, "Test2", NODE_REF, pn ); /* Error caught by NODE_DEBUG_REF - pn is already in a collection */
+
+	/* circular inclusion */
+	node_hash_add( pnHash, "Test3", NODE_REF, pnHash ); /* Error not caught by NODE_DEBUG_REF */
+	node_free( pnHash ); /* causes a crash */</pre>
+	<p>
+	NODE_DEBUG_UNICODE turns on extra string checking.  When NODE_DEBUG_UNICODE is set, strings that are passed
+	through varargs (i.e., after NODE_STRINGA or NODE_STRINGW in node_set() or node_hash_add(), etc.) are checked using the Windows API call IsTextUnicode
+	to assure that the string has the correct type.  The test is not perfect - in particular, it is hard to tell
+	the difference between a single-character ASCII string and a Unicode string when the ASCII string happens to
+	be followed by the right kind of garbage: <tt>A\0B\0\0\0</tt> is either a valid representation of the ASCII string "A" followed
+	by garbage, or else a valid representation of the Unicode string "AB".
+	<p>
+	There is one more debugging flag which is turned on by default in debug builds - NODE_DEBUG_HASHPERF.  In
+	order to use this feature, you need to call the debug version of the hash allocation functions --
+	node_hash_alloc_d and node_hash_alloc2_d.  This can be accomplished for your whole project by #including node.h
+	in a central place and following it with a #define block:
+	<pre>
+	#include "node.h"
+	#ifdef _DEBUG
+	#define node_hash_alloc()      node_hash_alloc_d()
+	#define node_hash_alloc2(n)    node_hash_alloc2_d(n)
+	#endif</pre>
+	<p>
+	NODE_DEBUG_HASHPERF triggers checking of hash load factors (number of entries per number of buckets) and warns
+	when the hash is freed if the load factor exceeds a limit (default 10.0).  The warning is written as a debug string
+	right to the Visual Studio debug messages window, and formatted such that you can use the usual Visual Studio
+	go-to-error method to find the line of code which allocated the hash.  This feature is intended to help find
+	spots where node_hash_alloc() is being used to create a hash into which thousands of elements are then put -- 
+	a larger number of buckets is really necessary, and node_hash_alloc2() should be used instead.
+
+	<h3> <a name="performance">Various non-user-visible performance changes</a> </h3>
+
+	<ul>
+	<li><b> Interning of node names </b><br/>
+	This is currently DISABLED in node-work because it was actually making things slower.  The interning
+	code ensured that only one copy of each name was currently used - maintining reference counts to
+	names used multiple times - and used 'soft' interning for searching.  The idea was to make hash
+	lookups faster by being able to compare pointers for equality instead of having to call stricmp().
+
+	<li><b> Separate allocator </b><br/>
+	The node library uses a separate allocator -- a version of dlmalloc -- instead of using the OS's
+	heap.  This is slightly faster.  The separate allocator is only used for retail ('Release') builds,
+	so that the CRT debugging allocator can be used for leak-tracking in debug builds.
+
+	<li><b> Free list </b><br/>
+	In release builds, the node library keeps a list of free'd nodes and re-uses them instead of going
+	back and forth to the allocator.
+
+	<li><b> Sequentially-allocated nodes </b><br/>
+	In release builds, the node library allocates a large block (65536 bytes worth) of memory and chops it
+	into 36-byte (or 68-byte when bags are turned on) node records and pre-loads the freelist with them.  This helps nodes that are allocated
+	near in time to be nearby in memory, possibly improving cache locality.  It also avoids allocator overhead
+	for a frequently-allocated known record size.
+
+	<li><b> Bags </b><br/>
+	
+
+	<li><b> Internal Function Calls </b><br/>
+
+	</ul>
+
+	<h2> Detailed Documentation of the API </h2>
+
+
+    <hr>
+    <address><a href="mailto:smikes@cubane.com">Sam Mikes</a></address>
+<!-- Created: Fri Aug  4 06:52:35 MDT 2006 -->
+<!-- hhmts start -->
+Last modified: Fri Aug  4 06:52:48 MDT 2006
+<!-- hhmts end -->
+  </body>
+</html>

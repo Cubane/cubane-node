@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioProject
+	ProjectType="Visual C++"
+	Version="9.00"
+	Name="CxxTest_1_Run"
+	ProjectGUID="{29D9DE0E-C275-4D09-938F-94FEE7381E17}"
+	RootNamespace="CxxTest_1_Run"
+	Keyword="MakeFileProj"
+	TargetFrameworkVersion="0"
+	>
+	<Platforms>
+		<Platform
+			Name="Win32"
+		/>
+		<Platform
+			Name="x64"
+		/>
+	</Platforms>
+	<ToolFiles>
+	</ToolFiles>
+	<Configurations>
+		<Configuration
+			Name="Release Static|Win32"
+			OutputDirectory=".\CxxTest_1_Run___Win32_Release_Static"
+			IntermediateDirectory=".\CxxTest_1_Run___Win32_Release_Static"
+			ConfigurationType="0"
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC60.vsprops"
+			UseOfMFC="0"
+			ATLMinimizesCRunTimeLibraryUsage="false"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="nmake DIR=ReleaseStatic RUNNERFLAGS=&quot;-title ReleaseStatic&quot; run"
+				ReBuildCommandLine="nmake DIR=ReleaseStatic RUNNERFLAGS=&quot;-title ReleaseStatic&quot; run /a"
+				CleanCommandLine=""
+				Output="ReleaseStatic\run.log"
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release Static|x64"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
+			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			ConfigurationType="0"
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC60.vsprops"
+			UseOfMFC="0"
+			ATLMinimizesCRunTimeLibraryUsage="false"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="nmake DIR=&quot;$(OutDir)&quot; RUNNERFLAGS=&quot;-title ReleaseStatic&quot; run"
+				ReBuildCommandLine="nmake DIR=&quot;$(OutDir)&quot; RUNNERFLAGS=&quot;-title ReleaseStatic&quot; run /a"
+				CleanCommandLine=""
+				Output="$(OutDir)\run.log"
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Debug Static|Win32"
+			OutputDirectory=".\CxxTest_1_Run___Win32_Debug_Static"
+			IntermediateDirectory=".\CxxTest_1_Run___Win32_Debug_Static"
+			ConfigurationType="0"
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC60.vsprops"
+			UseOfMFC="0"
+			ATLMinimizesCRunTimeLibraryUsage="false"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="nmake DIR=DebugStatic RUNNERFLAGS=&quot;-title DebugStatic&quot; run "
+				ReBuildCommandLine="nmake DIR=DebugStatic RUNNERFLAGS=&quot;-title DebugStatic&quot; run  /a"
+				CleanCommandLine=""
+				Output="DebugStatic\run.log"
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Debug Static|x64"
+			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
+			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			ConfigurationType="0"
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC60.vsprops"
+			UseOfMFC="0"
+			ATLMinimizesCRunTimeLibraryUsage="false"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="nmake DIR=&quot;$(OutDir)&quot; RUNNERFLAGS=&quot;-title DebugStatic&quot; run "
+				ReBuildCommandLine="nmake DIR=&quot;$(OutDir)&quot; RUNNERFLAGS=&quot;-title DebugStatic&quot; run  /a"
+				CleanCommandLine=""
+				Output="$(OutDir)\run.log"
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+	</Configurations>
+	<References>
+	</References>
+	<Files>
+		<File
+			RelativePath="Makefile"
+			>
+		</File>
+		<File
+			RelativePath="ReadMe.txt"
+			>
+		</File>
+	</Files>
+	<Globals>
+	</Globals>
+</VisualStudioProject>

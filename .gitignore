@@ -1,0 +1,14 @@
+x64-*
+x64
+test_nodeW.txt
+runner.cpp
+*.Sam.user
+Win32
+lib
+Release
+ReleaseStatic
+DebugStatic
+CxxTest_1_Run*
+test_nodea*
+node.ncb
+node.suo

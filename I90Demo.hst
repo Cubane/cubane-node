@@ -1,0 +1,50 @@
+﻿: {
+  Topic State: {
+    X: 1560  (0x00000618)
+    Y: 360  (0x00000168)
+    MV X: -1  (0xFFFFFFFF)
+    State: {
+      Active Annotation: ""
+      Saved Scale: 0.000000  (0x00000000)
+      V Saved Pos: 0  (0x00000000)
+      Style: 1  (0x00000001)
+      Scale: 0.240237  (0x3E76009B)
+      H Saved Pos: 0  (0x00000000)
+      Ratio: 0.333498  (0x3EAAC03B)
+      Center X: 0  (0x00000000)
+      Center: 0  (0x00000000)
+      Center Y: 0  (0x00000000)
+      Highlighted Hotspot String: ""
+    }
+    MV Y: -1  (0xFFFFFFFF)
+    Save: ""
+    URL: "dbdoc://file/D/CLIENT%20SOURCE/I90DEMO%20NEW/p101m6/1010601A.CAD"
+  }
+  Modified: DATA 8
+$ 00 00 00 00 00 00 00 00                            ........        
+  GUID: "{D8D602C1-5704-43B8-ABB3-6B01CD32CB9E}"
+  TOC State: {
+    X: 0  (0x00000000)
+    Y: 3578  (0x00000DFA)
+    MV X: 0  (0x00000000)
+    State: {
+      Active Annotation: ""
+      Saved Scale: 0.000000  (0x00000000)
+      V Saved Pos: 0  (0x00000000)
+      Style: 3  (0x00000003)
+      Scale: 0.000000  (0x00000000)
+      H Saved Pos: 0  (0x00000000)
+      Ratio: 0.000000  (0x00000000)
+      Center X: 0  (0x00000000)
+      Center: 0  (0x00000000)
+      Center Y: 0  (0x00000000)
+      Highlighted Hotspot String: ""
+    }
+    MV Y: 0  (0x00000000)
+    Save: "0x0000032F"
+    URL: "dbdoc://toc/"
+  }
+  Name: "I90Demo : Module 1,01,06 -- 1010601A CAD Drawing"
+  Current Reference: 0  (0x00000000)
+  Active Topic: 2  (0x00000002)
+}

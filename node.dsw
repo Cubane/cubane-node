@@ -3,7 +3,7 @@ Microsoft Developer Studio Workspace File, Format Version 6.00
 
 ###############################################################################
 
-Project: "node"=.\node.dsp - Package Owner=<4>
+Project: "CxxTest_1_Run"=".\CxxTest_1_Run.dsp" - Package Owner=<4>
 
 Package=<5>
 {{{
@@ -11,6 +11,90 @@ Package=<5>
 
 Package=<4>
 {{{
+    Begin Project Dependency
+    Project_Dep_Name CxxTest_2_Build
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name CxxTest_3_Generate
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name node
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "CxxTest_2_Build"=".\CxxTest_2_Build.dsp" - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name CxxTest_3_Generate
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name node
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name node_static
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "CxxTest_3_Generate"=".\CxxTest_3_Generate.dsp" - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name node
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "node"=".\node.dsp" - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+}}}
+
+###############################################################################
+
+Project: "node_static"=".\node_static.dsp" - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+}}}
+
+###############################################################################
+
+Project: "test_node"=".\test_node\test_node.dsp" - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name node
+    End Project Dependency
 }}}
 
 ###############################################################################

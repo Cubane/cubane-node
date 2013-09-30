@@ -1,6 +1,5 @@
 /* node.c -- implementation of node module
  * Initial version written 2000-08-07 Cubane Software
- * Copyright 2000-2003 G. Michaels Consulting Ltd.
  */
 
 #include <stdio.h>
@@ -8,27 +7,26 @@
 #include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
-#include "assert.h"
+#include <assert.h>
 #include <crtdbg.h>
 
-#define __STDC__	1
-
 #include "node.h"
-
+#include "message.h"
+#include "regex.h"
 #include "mv_hash.h"
 
-#include "message.h"
-
-#ifndef _DEBUG
-#define USE_DL_MALLOC
+#ifdef _DEBUG
+#define _CRTDBG_MAP_ALLOC 1
 #endif
-#include "malloc.h"
 
 /****************
  Module Variables
  ****************/
 
 static int node_nSpaces = 0;		/* the current level of indentation */
+static int node_nParseLine = 0;		/* the current line of the file we are parsing */
+static int node_fRegExCompiled = 0;	/* flag is TRUE if regexp's have been compiled */
+static regex_t node_reLine;			/* regular expression for the current line */
 
 /***********************
  Private Named Constants
@@ -54,18 +52,6 @@ static void node_list_init(node_t * pn);
 /* initialize a hash node */
 static void node_hash_init(node_t * pn, int nHashBuckets );
 
-/* clean up overlaid structures in a node changing type */
-static void node_cleanup( node_t * pn );
-
-/* dlmalloc a new string */
-static char * node_safe_copy(char * ps);
-
-/* read a line from a file into malloc'ed storage */
-static char * read_line( FILE * pfIn );
-
-/* escape and unescape pesky characters */
-static char * node_escape( char * psUnescaped );
-static char * node_unescape( char * psEscaped );
 
 /*******************************
  Public Function Implementations
@@ -80,7 +66,7 @@ node_t * node_alloc()
 {
 	node_t * pnNew = NULL;
 
-	pnNew = (node_t *)malloc( sizeof(node_t) );
+	pnNew = malloc( sizeof(node_t) );
 	if( pnNew == NULL ) 
 	{
 		errexit("Out of memory: can't allocate new node\n");
@@ -91,9 +77,9 @@ node_t * node_alloc()
 	pnNew->pnNext = NULL;
 
 	pnNew->nType = NODE_UNKNOWN;
+	pnNew->nFlags = 0;
 
 	pnNew->psName = NULL;
-	pnNew->nHash = 0;
 
 	pnNew->nValue  = 0;
 	pnNew->dfValue = 0.0;
@@ -116,6 +102,7 @@ node_t * node_alloc()
 /* free memory associated with a node, including children and neighbours*/
 void node_free(node_t *pn)
 {
+	int i;
 	node_t * pnSaved = NULL;
 
 	while( pn != NULL ) 
@@ -128,9 +115,43 @@ void node_free(node_t *pn)
 			free( pn->psName );
 			pn->psName = NULL;
 		}
-		
-		/* free and NULL all members of pn (type specific) */
-		node_cleanup( pn );
+
+		if( pn->psValue != NULL ) 
+		{
+			free( pn->psValue );
+			pn->psValue = NULL;
+		}
+
+		if( pn->pbValue != NULL ) 
+		{
+			free( pn->pbValue );
+			pn->pbValue = NULL;
+		}
+
+		node_free( pn->pnListHead );
+		pn->pnListHead = NULL;
+
+		/* no need to node_free pnListTail, because the recursive call to node_free on
+		 * pnListHead will free the whole list in the while loop
+		 */
+
+		for( i = 0; i < pn->nHashBuckets; i++ ) 
+		{
+			node_free( pn->ppnHashHeads[i] );
+			pn->ppnHashHeads[i] = NULL;
+		}
+
+		if( pn->ppnHashHeads != NULL ) 
+		{
+			free( pn->ppnHashHeads );
+			pn->ppnHashHeads = NULL;
+		}
+
+		if( pn->ppnHashTails != NULL ) 
+		{
+			free( pn->ppnHashTails );
+			pn->ppnHashTails = NULL;
+		}
 
 		free( pn );
 		pn = pnSaved;
@@ -150,9 +171,6 @@ static void node_list_init(node_t * pn)
 {
 	assert( pn != NULL );
 
-	if( pn == NULL )
-		return;
-
 	/* if it's a list already */
 	if( pn->nType == NODE_LIST ) 
 	{
@@ -165,17 +183,18 @@ static void node_list_init(node_t * pn)
 	{
 	/* else: it's not a list */
 
-		/* free and null the previous occupants of the union */
-		node_cleanup( pn );
-
 		/* set the type */
 		pn->nType = NODE_LIST;
+
+		/* free the old list head (if any) */
+		node_free( pn->pnListHead );
+
+		/* null the list head */
+		pn->pnListHead = NULL;
 
 		/* do the tail magic */
 		pn->pnListTail = (node_t*)&(pn->pnListHead);
 
-		/* initialize the element count */
-		pn->nListElements = 0;
 	}
 
 	return;
@@ -187,8 +206,6 @@ static void node_hash_init( node_t * pn, int nHashBuckets )
 	int i;
 
 	assert( pn != NULL );
-	if( pn == NULL )
-		return;
 	
 	/* if it's a hash, do nothing */
 	if(pn->nType == NODE_HASH)
@@ -198,30 +215,73 @@ static void node_hash_init( node_t * pn, int nHashBuckets )
 
 	/* otherwise, */
 	
-	/* free and null the previous occupants of the union */
-	node_cleanup( pn );
-
-	/* again, make sure no-one is corrupting our information */
-	assert(pn->nHashBuckets == 0);
-	assert(pn->ppnHashTails == NULL);
-	
-	/* set nHashBuckets */
-	pn->nHashBuckets = nHashBuckets;
-
-	/* allocate ppnHashHeads */
-	pn->ppnHashHeads = ( node_t ** )malloc( sizeof(node_t*)*pn->nHashBuckets );
-	
-	if( pn->ppnHashHeads == NULL )
+	/* if ppnHashHeads is set, clean it up: */
+	if(pn->ppnHashHeads != NULL)
 	{
-		errexit("Out of memory: can't allocate ppnHashHeads.\n");
+		/* make sure no-one is corrupting our memory */
+		assert(pn->nHashBuckets != 0);
+		assert(pn->ppnHashTails != NULL);
+
+		/* loop for 1..nHashBuckets */
+		for(i=0; i < pn->nHashBuckets; i++)
+		{
+			/* call node_free on each element of ppnHashHeads */
+			node_free(pn->ppnHashHeads[i]);
+
+		}
+		
+		/* if we're resizing this hash, we must free the has head and tail and reallocate storage */
+		if( pn->nHashBuckets != nHashBuckets )
+		{
+			free( pn->ppnHashHeads );
+			free( pn->ppnHashTails );
+
+			/* set the number of buckets to the requested number */
+			pn->nHashBuckets = nHashBuckets;
+
+			/* allocate ppnHashHeads */
+			pn->ppnHashHeads = malloc( sizeof(node_t*)*pn->nHashBuckets );
+			
+			if( pn->ppnHashHeads == NULL )
+			{
+				errexit("Out of memory: can't allocate ppnHashHeads.\n");
+			}
+
+			/* allocate ppnHashTails */
+			pn->ppnHashTails = malloc( sizeof(node_t*)*pn->nHashBuckets );
+
+			if( pn->ppnHashTails == NULL )
+			{
+				errexit("Out of memory: can't allocate ppnHashTails.\n");
+			}
+
+		}
 	}
-
-	/* allocate ppnHashTails */
-	pn->ppnHashTails = (node_t **)malloc( sizeof(node_t*)*pn->nHashBuckets );
-
-	if( pn->ppnHashTails == NULL )
+	else	/* pn->ppnHashHeads == NULL */
 	{
-		errexit("Out of memory: can't allocate ppnHashTails.\n");
+		/* again, make sure no-one is corrupting our information */
+		assert(pn->nHashBuckets == 0);
+		assert(pn->ppnHashTails == NULL);
+		
+		/* set nHashBuckets */
+		pn->nHashBuckets = nHashBuckets;
+
+		/* allocate ppnHashHeads */
+		pn->ppnHashHeads = malloc( sizeof(node_t*)*pn->nHashBuckets );
+		
+		if( pn->ppnHashHeads == NULL )
+		{
+			errexit("Out of memory: can't allocate ppnHashHeads.\n");
+		}
+
+		/* allocate ppnHashTails */
+		pn->ppnHashTails = malloc( sizeof(node_t*)*pn->nHashBuckets );
+
+		if( pn->ppnHashTails == NULL )
+		{
+			errexit("Out of memory: can't allocate ppnHashTails.\n");
+		}
+
 	}
 	
 	for( i=0; i < pn->nHashBuckets; i++ )
@@ -287,8 +347,6 @@ void node_set(node_t * pn, int nType, ...)
 	va_list valist;
 
 	assert( pn != NULL );
-    if( pn == NULL )
-        return;
 
 	/* va_start starts processing the variable arguments */
 	va_start(valist, nType);
@@ -311,9 +369,6 @@ void node_set(node_t * pn, int nType, ...)
 int node_get_int(node_t *pn)
 {
 	assert( pn != NULL );
-
-	if( pn == NULL )
-		return 0;
 
 	/* switch nType */
 	switch( pn->nType )
@@ -356,9 +411,6 @@ double node_get_real(node_t *pn)
 {
 	assert( pn != NULL );
 
-	if( pn == NULL )
-		return 0.0;
-
 	/* switch nType */
 	switch( pn->nType )
 	{
@@ -400,9 +452,6 @@ char * node_get_string(node_t *pn)
 {
 	assert( pn != NULL );
 	
-	if( pn == NULL )
-		return "";
-
 	switch (pn->nType) 
 	{
 	case NODE_STRING:
@@ -416,7 +465,7 @@ char * node_get_string(node_t *pn)
 		}
 
 		/* allocate enough memory in psValue to store string rep. of longest int */
-		pn->psValue = (char *)malloc( strlen("-2147483648") + 1 );
+		pn->psValue = malloc( strlen("-2147483648") + 1 );
 		if( pn->psValue == NULL ) 
 		{
 			errexit( "Out of memory: can't allocate memory for int to string conversion\n" );
@@ -436,7 +485,7 @@ char * node_get_string(node_t *pn)
 		}
 
 		/* allocate enough memory in psValue to store string rep. of real */
-		pn->psValue = (char *)malloc( strlen("-1000000000.00000") + 1 );
+		pn->psValue = malloc( strlen("-1000000000.00000") + 1 );
 		if( pn->psValue == NULL ) 
 		{
 			errexit( "Out of memory: can't allocate memory for real to string conversion\n" );
@@ -472,7 +521,7 @@ char * node_get_string(node_t *pn)
 		}
 
 		/* set psvalue to empty string */
-		pn->psValue = node_safe_copy("");
+		pn->psValue = safe_copy("");
 
 	}
 
@@ -483,12 +532,6 @@ char * node_get_string(node_t *pn)
 data_t * node_get_data(node_t *pn, int * pnLength)
 {
 	assert( pn != NULL );
-
-	if( pn == NULL )
-	{
-		*pnLength = 0;
-		return (data_t*)"";
-	}
 
 	switch( pn->nType )
 	{
@@ -540,9 +583,6 @@ void node_list_add(node_t * pnList, int nType, ...)
 
 	assert( pnList != NULL );
 
-	if( pnList == NULL )
-		return;
-
 	/* make sure list is initialized */
 	node_list_init( pnList );
 
@@ -563,7 +603,6 @@ void node_list_add(node_t * pnList, int nType, ...)
 		{
 			assert( 0 );
 			errmsg( "Attempted to add NULL node to list.\n" );
-			return;
 		}
 
 		/* if the node we're adding is in a list or hash, it may have
@@ -610,9 +649,6 @@ void node_list_add(node_t * pnList, int nType, ...)
 	/* advance the tail pointer */
 	pnList->pnListTail = pnList->pnListTail->pnNext;
 
-	/* increase the element count */
-	pnList->nListElements++;
-
 	return;
 
 }
@@ -626,9 +662,6 @@ void node_list_delete( node_t * pnList, node_t * pnToDelete )
 	assert( pnList != NULL );
 	assert( pnToDelete != NULL );
 	
-	if( pnList == NULL || pnToDelete == NULL )
-		return;
-
 	if( pnList->nType != NODE_LIST )
 	{
 		assert(0);
@@ -648,10 +681,6 @@ void node_list_delete( node_t * pnList, node_t * pnToDelete )
 			/* fix the tail */
 			pnList->pnListTail = (node_t*)&(pnList->pnListHead);
 		}
-
-		assert( pnList->nListElements > 0 );
-		pnList->nListElements--;
-
 		return;
 	}
 
@@ -672,9 +701,6 @@ void node_list_delete( node_t * pnList, node_t * pnToDelete )
 				pnList->pnListTail = pnPrevious;
 			}
 
-			assert( pnList->nListElements > 0 );
-			pnList->nListElements--;
-
 			return;
 		}
 	}
@@ -688,9 +714,6 @@ void node_list_delete( node_t * pnList, node_t * pnToDelete )
 node_t * node_first(node_t * pnList)
 {
 	assert( pnList != NULL );
-
-	if( pnList == NULL )
-		return NULL;
 
 	/* half of a simple iterator: returns pnListHead */
 	if( pnList->nType == NODE_LIST )
@@ -713,121 +736,6 @@ node_t * node_next(node_t * pn)
 	return pn->pnNext;
 }
 
-/* Stack functions: treating the list as a stack */
-/* pushes a node onto the front of a list */
-void node_push( node_t * pnList, int nType, ... )
-{
-	va_list valist;
-
-    node_t * pnElement = NULL;
-    node_t * pnNew = NULL;
-    node_t * pnSaveNext = NULL;
-
-	assert( pnList != NULL );
-
-	if( pnList == NULL )
-		return;
-
-	/* make sure list is initialized */
-	node_list_init( pnList );
-
-	/* grab the variable arguments */
-	va_start(valist, nType);
-
-	switch( nType)
-	{
-	/* if it's a list, hash or node */
-	case NODE_LIST:
-	case NODE_HASH:
-	case NODE_NODE:
-	
-		/* get and check the variable argument */
-		pnElement = va_arg( valist, node_t * );
-
-		if( pnElement == NULL ) 
-		{
-			assert( 0 );
-			errmsg( "Attempted to add NULL node to list.\n" );
-			return;
-		}
-
-		/* if the node we're adding is in a list or hash, it may have
-		 * pnNext set; temporarily set pnNext to NULL while we copy the
-		 * node so we don't take the rest of its list or hash along
-		 */
-
-		/* save the pointer to next */
-		pnSaveNext = pnElement->pnNext;
-		pnElement->pnNext = NULL;
-
-		/* make a deep copy of the node to be added (without its neighbors) */
-		pnNew = node_copy( pnElement );
-
-		/* restore the pointer to next */
-		pnElement->pnNext = pnSaveNext;
-
-		/* assert that the new node is terminated */
-		assert(pnNew->pnNext == NULL);
-		break;
-
-	/* otherwise */
-	default:
-
-		/* create a new node with node_alloc */
-		pnNew = node_alloc();
-
-		/* pass the variable arguments to node_set_valist */
-		node_set_valist(pnNew, nType, valist);
-
-		break;
-	}
-
-    /* put the node at the head of the list */
-    pnNew->pnNext = pnList->pnListHead;
-
-    /* put the new list-chain in the list */
-    pnList->pnListHead = pnNew;
-
-    /* if the list was empty */
-    if( pnList->pnListHead->pnNext == NULL )
-    {
-        /* advance the tail pointer */
-        pnList->pnListTail = pnList->pnListTail->pnNext;
-    }
-
-	pnList->nListElements++;
-
-    return;
-}
-
-/* pops a node off the front of a list */
-node_t * node_pop( node_t * pnList )
-{
-    node_t * pnPopped = NULL;
-
-    assert( pnList != NULL );
-    assert( pnList->nType == NODE_LIST );
-
-	if( pnList == NULL || pnList->nType != NODE_LIST )
-		return NULL;
-
-    /* if the list is empty */
-    if( pnList->pnListHead == NULL )
-    {
-        /* return NULL */
-        return NULL;
-    }
-
-    /* get a pointer to the list head */
-    pnPopped = node_first( pnList );
-
-    /* delete the node from the list */
-    node_list_delete( pnList, pnPopped );
-
-    /* return the old head */
-    return pnPopped;
-}
-
 /**************
  Hash Functions
  **************/
@@ -838,9 +746,6 @@ void node_hash_add(node_t * pnHash, char * psKey, int nType, ...)
 	node_t * pnElement = NULL;
 	node_t * pnNew = NULL;
 	node_t * pnSaveNext = NULL;
-
-	node_t * pnOld = NULL;
-
 	va_list valist;
 	int nBucket;
 	unsigned long nHash;
@@ -848,22 +753,8 @@ void node_hash_add(node_t * pnHash, char * psKey, int nType, ...)
 	assert( pnHash != NULL );
 	assert( psKey != NULL );
 
-	if( pnHash == NULL || psKey == NULL )
-		return;
-
 	/* make sure hash is initialized */
 	node_hash_init( pnHash, DEFAULT_HASHBUCKETS );
-
-	/* if the item already exists in the hash */
-	pnOld = node_hash_get( pnHash, psKey );
-	if( pnOld != NULL )
-	{
-		/* delete it */
-		node_hash_delete( pnHash, pnOld );
-
-		/* free it */
-		node_free( pnOld );
-	}
 
 	/* grab the variable arguments */
 	va_start(valist, nType);
@@ -883,7 +774,6 @@ void node_hash_add(node_t * pnHash, char * psKey, int nType, ...)
 		{
 			assert( 0 );
 			errmsg( "Attempted to add NULL node to hash.\n" );
-			return;
 		}
 
 		/* if the node we're adding is in a list or hash, it may have
@@ -949,14 +839,10 @@ node_t * node_hash_get(node_t * pnHash, char * psKey)
 {
 	unsigned long nHash;
 	int nBucket;
-	int nMasked;
 	node_t * pnElement = NULL;
 
 	assert( pnHash != NULL );
 	assert( psKey != NULL );
-
-	if( pnHash == NULL || psKey == NULL )
-		return NULL;
 
 	/* if nType is not NODE_HASH, assert and return NULL */
 	if( pnHash->nType != NODE_HASH )
@@ -974,18 +860,14 @@ node_t * node_hash_get(node_t * pnHash, char * psKey)
 	/* search the bucket for value associated with psKey */
 	pnElement = pnHash->ppnHashHeads[nBucket];
 
-	/* get the masked hash value */
-	nMasked = nHash & NODE_HASH_MASK;
-
 	while( pnElement != NULL)
 	{
-		if( nMasked == pnElement->nHash &&
-			 stricmp( pnElement->psName, psKey ) == 0 )
+		if( strcmp( pnElement->psName, psKey ) == 0 )
 		{
 			/* if found, return a pointer to the found element */
 			return pnElement;
 		}
-		pnElement = pnElement->pnNext;
+		pnElement = node_next( pnElement );
 	}
 
 	/* if not found, return NULL */
@@ -1004,18 +886,11 @@ void node_hash_delete( node_t * pnHash, node_t * pnToDelete )
 	assert( pnToDelete != NULL );
 	assert( pnToDelete->psName != NULL );
 	
-	if( pnHash == NULL || pnToDelete == NULL || pnToDelete->psName == NULL )
-		return;
-
 	if( pnHash->nType != NODE_HASH )
 	{
 		assert(0);
 		return;
 	}
-
-	/* decrement the count of hash members */
-	assert( pnHash->nHashElements > 0 );
-	pnHash->nHashElements--;
 
 	/* hash the name of the node to delete */
 	nHash = node_hash( pnToDelete->psName );
@@ -1072,9 +947,9 @@ void node_hash_delete( node_t * pnHash, node_t * pnToDelete )
 /* set the name of a node */
 void node_set_name (node_t * pn, char * psName)
 {
+	char * psTemp;
+
 	assert( pn != NULL );
-	if( pn == NULL )
-		return;
 
 	/* test psName for validity */
 	assert( psName != NULL );
@@ -1097,8 +972,19 @@ void node_set_name (node_t * pn, char * psName)
 	}
 
 	/* copy psName onto pn->psName */
-	pn->psName = node_safe_copy(psName);
-	pn->nHash = node_hash( psName ) & NODE_HASH_MASK;
+	pn->psName = safe_copy(psName);
+
+	/* if there is a ':' in the name, assert and kill it */
+	psTemp = strchr( pn->psName, ':' );
+	
+	if( psTemp != NULL )	/* there is a colon in the name */
+	{
+		assert(0);	/* the character ':' is not permitted in a node name */
+		
+		/* terminate the name at the colon */
+		*psTemp = '\0';
+
+	}
 
 	return;
 }
@@ -1107,10 +993,6 @@ void node_set_name (node_t * pn, char * psName)
 char * node_get_name(node_t * pn)
 {
 	assert( pn != NULL );
-
-	if( pn == NULL )
-		return NULL;
-
 	return pn->psName;
 }
 
@@ -1124,28 +1006,28 @@ void node_dump(node_t * pn, FILE * pfOut, int nOptions)
 	int i;
 	int nRows;
 	node_t * pnElt;
-    float fTemp;
-
-	char * psEscaped = NULL;
+        float fTemp;
 
 	assert( pn != NULL );
 	assert( pfOut != NULL );
-	
-	if( pn == NULL || pfOut == NULL )
-		return;
 
+	/* if the Debug flag is set in the node, don't write out the 
+		node unless nOptions includes the DEBUG option */
+	if( (pn->nFlags & DEBUG_FLAG) && !(nOptions & DO_DUMP) )
+	{
+		return;
+	}
+	
 	/* write node_nSpaces spaces */
 	for( i=0; i < node_nSpaces; i++ )
 	{
 		fprintf( pfOut, " " );
 	}
 
-	/* write the name (if any) -- curently booby-trapped if there are ':'s in the name */
+	/* write the name (if any) */
 	if( pn->psName != NULL)
 	{
-		psEscaped = node_escape( pn->psName );
-		fprintf( pfOut, "%s", psEscaped );
-		free( psEscaped );
+		fprintf( pfOut, "%s", pn->psName );
 	}
 
 	/* write ':' */
@@ -1158,14 +1040,12 @@ void node_dump(node_t * pn, FILE * pfOut, int nOptions)
 		break;
 
 	case NODE_REAL:
-        fTemp = (float)pn->dfValue;
+             fTemp = (float)pn->dfValue;
 		fprintf( pfOut, "%f  (0x%08X)\n", pn->dfValue, *((int*)&fTemp) );
 		break;
 
 	case NODE_STRING:
-		psEscaped = node_escape( pn->psValue );
-		fprintf( pfOut, "\"%s\"\n", psEscaped );
-		free( psEscaped );
+		fprintf( pfOut, "\"%s\"\n", pn->psValue );
 		break;
 
 	case NODE_DATA:
@@ -1302,6 +1182,7 @@ void node_dump(node_t * pn, FILE * pfOut, int nOptions)
  *  NP_NODE   : succesful read of node element
  *  NP_CPAREN : only thing on line is close paren
  *  NP_CBRACE : only thing on line is close brace
+ *  NP_DUMP   : only thing on line is hex dump
  *  NP_SERROR : syntax error reading line; skip this line
  *  NP_EOF    : end of file
  *
@@ -1310,202 +1191,348 @@ void node_dump(node_t * pn, FILE * pfOut, int nOptions)
  ***********************************************************************/
 int node_parse(FILE *pfIn, node_t ** ppn)
 {
-	char * psLine = NULL;
-	char * psPos = NULL;
-
-	char * psColon = NULL;
-	char * psEscapedName = NULL;
-	char * psName = NULL;
-
-	node_t * pn = NULL;
+	char psLineBuffer[1024];
+	regmatch_t rmMatches[5];
+	int nResult;
+	unsigned int nNotBlank;
+	int nRows;
+	int i;
+	node_t * pnNew = NULL;
 	node_t * pnChild = NULL;
-	char * psType = NULL;
+	char * psQuote = NULL;
+	
+	assert(pfIn != NULL);
+	assert(ppn != NULL);
 
-	char * psTrailingQuote = NULL;
+	if(!node_fRegExCompiled )
+	{
+		/* compile all regular expressions and set the compiled flag */
 
-	int nDataLength = 0;
-	data_t * pb = NULL;
-	int nRows = 0;
-	int i = 0;
-	char * psData = NULL;
-	char * psCursor = NULL;
-	int b = 0;
+		/* a line is spaces, an optional name, a colon, spaces, a type character, 
+		   and the rest */
 
-	int nResult = 0;
+		nResult = regcomp( &node_reLine, "^([0-9]+#)?[[:blank:]]*([^:]*):[[:blank:]]*(.)(.*)$", 
+							REG_EXTENDED );
+#define MATCH_WHOLE     0
+#define MATCH_SEQNO     1
+#define MATCH_NAME      2
+#define MATCH_TYPECHAR  3
+#define MATCH_REST      4    
 
-	char * psUnescaped = NULL;
+		if(nResult != 0)
+		{
+			errexit("Error compiling regular expression reLine: %s.\n", regerror(nResult) );
+		}
 
-	/* initialize the returned node */
-	*ppn = NULL;
+		/* set the compiled flag */
+		node_fRegExCompiled = 1;
+	}
 
-	/* read a line */
-READ_LINE:
-	psLine = read_line( pfIn );
+	/* while not EOF, read lines from the file*/
+read_line:
+	if( fgets(psLineBuffer, sizeof(psLineBuffer), pfIn) == NULL )
+	{
+		/* re-initialize line counter */
+		node_nParseLine = 0;
 
-	/* if it fails */
-	if( psLine == NULL )
+		*ppn = NULL;
 		return NP_EOF;
-
-	/* skip initial white-space */
-	for( psPos = psLine; isspace( *psPos ); psPos++ )
-		/*empty*/;
-
-	/* what kind of line is this? */
-
-	/* if it's blank -- read another line */
-	if( *psPos == '\0' )
-	{
-		free( psLine );
-		goto READ_LINE;
 	}
 
-	/* if it's a close paren */
-	if( *psPos == ')' )
+	/* increment the line counter */
+	node_nParseLine++;
+	
+	/* if the line is completely blank, read another */
+	if( ( nNotBlank = strspn(psLineBuffer, " \t") ) == strlen(psLineBuffer) )
 	{
-		free( psLine );
-		return NP_CPAREN;
+		goto read_line;
 	}
 
-	/* if it's a close brace */
-	if( *psPos == '}' )
+	nResult = regexec( &node_reLine, psLineBuffer, sizeof(rmMatches)/sizeof(regmatch_t), rmMatches, 0 );
+
+	/* if no match: */
+	if( nResult == REG_NOMATCH )
 	{
-		free( psLine );
-		return NP_CBRACE;
+		/* set the returned node to null because we are not a node */
+		*ppn = NULL;
+
+		/* determine what type of line it is and return it */
+		switch( psLineBuffer[nNotBlank] )
+		{
+		case ')':
+			return NP_CPAREN;
+		case '}':
+			return NP_CBRACE;
+		case '$':
+			return NP_DUMP;
+		default:
+			errmsg( "Illegal first character ('%c') on non-node line %d.\n", 
+				psLineBuffer[nNotBlank], node_nParseLine );					
+			goto parse_err;
+
+		} /* switch */
+	} 
+	else if( nResult != 0 ) 
+	{
+		/* regular expression error */
+		errmsg("Regular expression error trying to match line %d: %s\n",
+				node_nParseLine, regerror( nResult ) );
+		goto parse_err;
 	}
 
-	/* it's a normal node */
-
-	/* unescape the name */
-	psColon = strchr( psPos, ':' );
-	if( psColon == NULL )
-		return NP_INVALID;
-
-	if( psColon != psPos )
-	{
-		psEscapedName = (char *)malloc( psColon - psPos + 1);
-		if( psEscapedName == NULL )
-			exit(1);
-		strncpy( psEscapedName, psPos, psColon - psPos );
-		psEscapedName[psColon-psPos] = '\0';
-		psName = node_unescape( psEscapedName );
-		if( psEscapedName != NULL )
-			free( psEscapedName );
-	}
-
-	/* figure out the node type */
-	for( psType = psColon+1; isspace( *psType ); psType++ )
-		/* empty */;
+	/* we matched the line regular expression */
 
 	/* allocate a new node */
-	pn = node_alloc();
-	if( psName != NULL )
+	pnNew = node_alloc();
+
+	/* \1 is the name, if any */
+	if( rmMatches[MATCH_NAME].rm_so != rmMatches[MATCH_NAME].rm_eo )
 	{
-		node_set_name( pn, psName );
-		free( psName );
+		/* we found a name of more than 0 length */
+
+		/* terminate the name at the colon */
+		psLineBuffer[ rmMatches[MATCH_NAME].rm_eo ] = '\0';
+
+		/* set the name */
+		node_set_name( pnNew, psLineBuffer + rmMatches[MATCH_NAME].rm_so ) ;
+
 	}
 
-	/* switch the node type */
-	switch( *psType )
+	/* \2 tells us the node type */
+	switch( psLineBuffer[ rmMatches[MATCH_TYPECHAR].rm_so ] )
 	{
-	case '.': case '0': case '1': case '2': case '3': case '4':
-	case '-': case '5': case '6': case '7': case '8': case '9':
-		if( strchr( psType, '.' ) != NULL )
-			node_set( pn, NODE_REAL, atof( psType ) );
-		else
-			node_set( pn, NODE_INT, atoi( psType ) );
+		/* if it's digit -> numeric */
+	case '0': case '1': case '2': case '3': case '4': case '.':
+	case '5': case '6': case '7': case '8': case '9': case '-':
+		pnNew->nType = NODE_NUMERIC;
 		break;
-	case '"':
-		/* remove trailing quote */
-		psTrailingQuote = strrchr( psType, '"' );
-		if( psTrailingQuote == NULL )
-		{
-			errmsg( "Unterminated string.\n" );
-			goto PARSE_ERROR;
-		}
 
-		*psTrailingQuote = '\0';
-
-		psUnescaped = node_unescape( psType+1 );
-		node_set( pn, NODE_STRING, psUnescaped );
-		free( psUnescaped );
-		break;
+		/* if it's a 'D' => data */
 	case 'D':
-		nDataLength = atoi( psType + 4 );
-		pb = (data_t *)malloc( nDataLength );
-		if( pb == NULL )
-			exit(1);
-
-		/* loop over the rows of the binary data */
-		for( nRows = 0; nRows < (nDataLength+15)/16; nRows++ )
-		{
-			/* read a new line */
-			psData = read_line( pfIn );
-			psCursor = psData+1;
-
-			for( i = nRows*16; i < nDataLength && i < (nRows+1)*16; i++ )
-			{
-				/* skip whitespace */
-				psCursor += strspn( psCursor, " " );
-
-				/* convert the hex data to a byte */
-				sscanf( psCursor, "%2x", &b );
-				psCursor += 2;
-
-				/* set the data */
-				pb[i] = (data_t)b;
-			}
-			free( psData );
-		}
-
-		node_set( pn, NODE_DATA, nDataLength, pb );
-		free( pb );
+		pnNew->nType = NODE_DATA;
 		break;
+
+		/* if it's a '"' => string */
+	case '"':
+		pnNew->nType = NODE_STRING;
+		break;
+
+		/* if it's a '(' => list */
 	case '(':
-		node_list_init( pn );
-		while( (nResult = node_parse( pfIn, &pnChild ) ) == NP_NODE )
+		node_list_init( pnNew );
+		break;
+
+		/* if it's a '{' => hash */
+	case '{':
+		node_hash_init( pnNew, DEFAULT_HASHBUCKETS );
+		break;
+
+		/* this is an unknown kind of node */
+	default:
+		errmsg( "Unknown node type: '%c' on line %d.\n",  psLineBuffer[ rmMatches[MATCH_TYPECHAR].rm_so ], 
+				node_nParseLine );
+		goto parse_err;
+	}
+
+	/* \3 may provide additional data */
+	switch( pnNew->nType )
+	{
+		/* if type is numeric: */
+	case NODE_NUMERIC:
+
+		/* a '.' in \2 tells us it's real */
+		if( strchr( psLineBuffer + rmMatches[MATCH_TYPECHAR].rm_so, '.' ))
 		{
-			node_list_add( pn, NODE_NODE, pnChild );
+			/* if it's real: dfValue = atof( \3 ) */
+			pnNew->nType = NODE_REAL;
+			pnNew->dfValue = atof( psLineBuffer + rmMatches[MATCH_TYPECHAR].rm_so );
+		}
+		else
+		{
+			/* if it's int : nValue = atoi( \3 ) */
+			pnNew->nType = NODE_INT;
+			pnNew->nValue = atoi( psLineBuffer + rmMatches[MATCH_TYPECHAR].rm_so  );
+		}
+		break;
+
+		/* if it's data: */
+	case NODE_DATA:
+
+		/* \3 is 'ATA\s*(\d*)' where the digits tell how many bytes of data follow */
+		pnNew->nDataLength = atoi(psLineBuffer + rmMatches[MATCH_REST].rm_so + 3 );
+		break;
+
+		/* if it's a string: */
+	case NODE_STRING:
+
+		/* \3 is '(.*)"' where the string data is everything up to the quote */
+		psQuote = strrchr(psLineBuffer + rmMatches[MATCH_REST].rm_so, '"' );
+
+		if(psQuote == NULL)
+		{
+			errmsg( "Unterminated string on line %d.\n", node_nParseLine );
+			goto parse_err;
+		}
+		
+		/* Replace the end quote with a '\0' to terminate the string  */
+		*psQuote = '\0';
+
+		/* Copy the string value into pnNew */
+		pnNew->psValue = safe_copy( psLineBuffer + rmMatches[MATCH_REST].rm_so );
+
+		break;
+	
+	}
+
+	/* More parsing for lists, hashes and data elements: */
+	switch(pnNew->nType)
+	{
+		/* if it's a list: */
+	case NODE_LIST:
+
+		/* loop: call node_parse() until it returns the correct closing element */
+		while( ( nResult = node_parse(pfIn, &pnChild ) ) == NP_NODE )
+		{
+			/* put the newly-read element into the list */
+			node_list_add( pnNew, NODE_NODE, pnChild );
 			node_free( pnChild );
 		}
 
+		/* if the buffer contains the required closing element, good */
+		/* if not, node_free() the node and report a syntax error upwards */
 		if( nResult != NP_CPAREN )
 		{
-			errmsg( "No close paren for list.\n" );
-			goto PARSE_ERROR;
+			errmsg( "No close paren for list on line %d.\n", node_nParseLine );
+			goto parse_err;
 		}
 
 		break;
-	case '{':
-		node_hash_init( pn, DEFAULT_HASHBUCKETS );
-		while( (nResult = node_parse( pfIn, &pnChild ) ) == NP_NODE )
+
+		/* if it's a hash: */
+	case NODE_HASH:
+
+		/* loop: call node_parse() until it returns the correct closing element */
+		while( ( nResult = node_parse(pfIn, &pnChild ) ) == NP_NODE )
 		{
-			if( node_get_name( pnChild ) != NULL )
-				node_hash_add( pn, node_get_name( pnChild ), NODE_NODE, pnChild );
+			/* put the newly-read element into the hash */
+			if( pnChild->psName == NULL )
+			{
+				errmsg( "Child of hash on line %d has no name -- skipping.\n", 
+						node_nParseLine );
+			}
 			else
-				errmsg( "Child of hash has no name -- skipping.\n" );
+			{
+				node_hash_add( pnNew, pnChild->psName, NODE_NODE, pnChild );
+			}
 
 			node_free( pnChild );
 		}
 
+		/* if the buffer contains the required closing element, good */
+		/* if not, node_free() the node and report a syntax error upwards */
 		if( nResult != NP_CBRACE )
 		{
-			errmsg( "No close brace for hash.\n" );
-			goto PARSE_ERROR;
+			errmsg( "No close brace for hash on line %d.\n", node_nParseLine );
+			goto parse_err;
+		}
+		break;
+
+		/* if it's a data element: */
+	case NODE_DATA:
+
+		/* allocate nDataLength storage in pbData */
+		assert( pnNew->nDataLength > 0 );
+		if( (size_t)pnNew->nDataLength > LOTS_OF_MEMORY )
+		{
+			wrnmsg("Suspicious amount of memory (%d) allocated for data element on line %d\n",
+					pnNew->nDataLength, node_nParseLine );
 		}
 
+		pnNew->pbValue = malloc( pnNew->nDataLength );
+
+		if(pnNew->pbValue == NULL )
+		{
+			errexit("Out of memory to allocate %d bytes for data element on line %d.\n", 
+				pnNew->nDataLength, node_nParseLine );
+		}
+
+		/* loop over the rows of the binary data in pbValue */
+		for( nRows=0; nRows < ( pnNew->nDataLength + 15 )/16; nRows ++ )
+		{
+			int nNextChar;
+
+			/* peek at the first character on the next line */
+			if( (nNextChar = fgetc(pfIn)) == '$')
+			{
+			/* if it's a $, we're in a hex dump */
+
+				char* psCursor;
+				int b;
+
+				/* read a line of hex dump */
+				fgets( psLineBuffer, sizeof(psLineBuffer), pfIn );
+				node_nParseLine++;
+
+				psCursor = psLineBuffer;
+
+				/* loop over the hex representations of the bytes */
+				for( i = nRows*16; i < pnNew->nDataLength && i < (nRows+1)*16; i++)
+				{
+					/* skip whitespace */
+					psCursor += strspn(psCursor, " ");
+
+					/* convert the hex data into a byte */
+					nResult = sscanf(psCursor,"%2x",&b);
+					if( nResult != 1 ) 
+					{
+						errmsg("Unable to read hex data: stopped at %s on line %d.\n",
+								psCursor, node_nParseLine );
+						goto parse_err;
+					}
+
+					/* advance cursor */
+					psCursor += 2;
+
+					/* 2 nybbles of hex data should never be more than 255
+					 * and *never* be negative */
+					assert( b >= 0 );
+					assert( b <= 255 );
+
+					/* store the byte in pbValue */
+					pnNew->pbValue[ i ] = (data_t)b;
+				}
+			}
+			else /* first character is not a '$' */
+			{
+			/* otherwise, it's corrupt, since we haven't reached the last row */
+
+				/* put the character back */
+				ungetc( nNextChar, pfIn );
+
+				errmsg( "Expected more lines of hex data at line %d.\n", node_nParseLine );
+
+				goto parse_err;
+			}
+
+		}
 		break;
 	}
 
-	free( psLine );
-	*ppn = pn;
+	/* Return NP_NODE and *ppn = pn, the node we read. */
+	*ppn = pnNew;
 	return NP_NODE;
 
-PARSE_ERROR:
-	if( pn != NULL )
-		node_free( pn );
-	free( psLine );
-	
+parse_err:
+	if( pnNew != NULL ) 
+	{
+		node_free( pnNew );
+	}
+
+	*ppn = NULL;
+	node_nParseLine = 0;
+
 	return NP_SERROR;
+
 }
 
 /*****************
@@ -1513,95 +1540,125 @@ PARSE_ERROR:
  *****************/
 
 /* deep copy a node */
-node_t * node_copy(node_t *pnSource)
+node_t * node_copy(node_t *pn)
 {
+	int i;
 	node_t * pnCopy = NULL;
-	node_t * pn = NULL;
-	node_t * pnKeys = NULL;
 
 	/* if it's NULL, return NULL */
-	if( pnSource == NULL )
+	if( pn == NULL )
 	{
 		return NULL;
 	}
 
 	/* allocate new node */
-	if( pnSource->nType == NODE_HASH )
-		pnCopy = node_hash_alloc2( pnSource->nHashBuckets );
-	else if( pnSource->nType == NODE_LIST )
-		pnCopy = node_list_alloc();
-	else
-		pnCopy = node_alloc();
+	pnCopy = node_alloc();
 
 	/* copy the type */
-	pnCopy->nType = pnSource->nType;
+	pnCopy->nType = pn->nType;
+
+	/* copy the Flags */
+	pnCopy->nFlags = pn->nFlags;
 
 	/* copy the name */
-	pnCopy->psName = node_safe_copy( pnSource->psName );
-	pnCopy->nHash = pnSource->nHash;
+	pnCopy->psName = safe_copy( pn->psName );
 	
-	/* ignore the next node */
-	pnCopy->pnNext = NULL;
+	/* if there's a pnNext, deep copy it */
+	pnCopy->pnNext = node_copy( pn->pnNext );
 
 	/* copy the data */
 	switch( pnCopy->nType )
 	{
 	case NODE_INT:
-		pnCopy->nValue = pnSource->nValue;
+		pnCopy->nValue = pn->nValue;
 		break;
 
 	case NODE_REAL:
-		pnCopy->dfValue = pnSource->dfValue;
+		pnCopy->dfValue = pn->dfValue;
 		break;
 
 	case NODE_STRING:
-		pnCopy->psValue = node_safe_copy( pnSource->psValue );
+		pnCopy->psValue = safe_copy( pn->psValue );
 		break;
 
 	case NODE_DATA:
 
 		/* copy the data length */
-		pnCopy->nDataLength = pnSource->nDataLength;
+		pnCopy->nDataLength = pn->nDataLength;
 
 		/* malloc and memcpy the data */
-		pnCopy->pbValue = (data_t * )malloc( pnCopy->nDataLength );
+		pnCopy->pbValue = malloc( pnCopy->nDataLength );
 		
 		if( pnCopy->pbValue == NULL )
 		{
 			errexit( "Out of memory: can't allocate DATA buffer for copy.\n" );
 		}
 
-		memcpy( pnCopy->pbValue, pnSource->pbValue, pnCopy->nDataLength );	
+		memcpy( pnCopy->pbValue, pn->pbValue, pnCopy->nDataLength );	
 		break;
 
 		/* LIST : deep copy the list */
 	case NODE_LIST:
 
-		/* deep copy the list */
-		for( pn = node_first( pnSource ); pn != NULL; pn = node_next( pn ) )
+		/* copy the list */
+		pnCopy->pnListHead = node_copy( pn->pnListHead );
+
+		/* start the tail (use magic) */
+		pnCopy->pnListTail= (node_t *)&(pnCopy->pnListHead);
+
+		/* scroll the tail to the end */
+		while( pnCopy->pnListTail->pnNext != NULL )
 		{
-			node_list_add( pnCopy, NODE_NODE, pn );
+			pnCopy->pnListTail = pnCopy->pnListTail->pnNext;
 		}
 		break;
 
 		/* HASH: deep copy the hash */
 	case NODE_HASH:
 
-		/* get the keys */
-		pnKeys = node_hash_keys( pnSource );
+		/* copy the number of buckets */
+		pnCopy->nHashBuckets = pn->nHashBuckets;
+
+		/* copy the number of elements */
+		pnCopy->nHashElements = pn->nHashElements;
+
+		/* allocate buckets: heads */
+		pnCopy->ppnHashHeads = malloc( sizeof(node_t *)*pnCopy->nHashBuckets );
+
+		if( pnCopy->ppnHashHeads == NULL)
+		{
+			errexit( "Out of memory: can't allocate storage for a hash copy.\n" );
+		}
+
+		/* ... tails */
+		pnCopy->ppnHashTails= malloc( sizeof(node_t *)*pnCopy->nHashBuckets );
+
+		if( pnCopy->ppnHashTails == NULL)
+		{
+			errexit( "Out of memory: can't allocate storage for a hash copy.\n" );
+		}
 
 		/* copy the elements */
-		for( pn = node_first( pnKeys ); pn != NULL; pn = node_next( pn ) )
+		for(i=0; i < pnCopy->nHashBuckets; i++)
 		{
-			char * psKey = node_get_string( pn );
-			node_hash_add( pnCopy, psKey, NODE_NODE, node_hash_get( pnSource, psKey ) );
+			/* copy the bucket */
+			pnCopy->ppnHashHeads[i] = node_copy( pn->ppnHashHeads[i] );
+
+			/* start the tail */
+			pnCopy->ppnHashTails[i] = (node_t *)&(pnCopy->ppnHashHeads[i]);
+
+			/* scroll the tail */
+			while( pnCopy->ppnHashTails[i]->pnNext != NULL )
+			{
+				pnCopy->ppnHashTails[i] = pnCopy->ppnHashTails[i]->pnNext;
+			}
+
 		}
-		node_free( pnKeys );
 	
 		break;
 
 	default:
-		errmsg( "Attempted to copy illegal node type (value %d).\n", pnSource->nType );
+		errmsg( "Attempted to copy illegal node type (value %d).\n", pn->nType );
 	}
 
 	/* return the copied node */		
@@ -1610,21 +1667,21 @@ node_t * node_copy(node_t *pnSource)
 }
 
 /* safely copy a string */
-static char * node_safe_copy(char * ps)
+char * safe_copy(char * ps)
 {
 	char * psCopy;
 
-	/* you shouldn't be sending null pointers to node_safe_copy */
+	/* you shouldn't be sending null pointers to safe_copy */
 	if( ps == NULL ) 
 	{
 		return NULL;
 	}
 
 	/* allocate memory */
-	psCopy = (char *)malloc( strlen(ps) + 1);
+	psCopy = malloc( strlen(ps) + 1);
 	if(psCopy == NULL)
 	{
-		errexit("Out of memory: can't allocate storage for node_safe_copy.\n");
+		errexit("Out of memory: can't allocate storage for safe_copy.\n");
 	}
 
 	/* copy the string */
@@ -1662,23 +1719,14 @@ static void node_set_valist(node_t *pn, int nType, va_list valist)
 	data_t * pbValue = NULL;
 
 	assert( pn != NULL );
-
-	if( pn == NULL )
-		return;
 	
 	switch (nType)
 	{
 	case NODE_INT:
-		/* clean up */
-		node_cleanup( pn );
-
 		pn->nValue = va_arg(valist, int);
 		break;
 
 	case NODE_REAL:
-		/* clean up */
-		node_cleanup( pn );
-
 		pn->dfValue = va_arg(valist, double);
 		break;
 
@@ -1686,6 +1734,7 @@ static void node_set_valist(node_t *pn, int nType, va_list valist)
 		psValue = va_arg(valist, char *);
 		if(psValue == NULL)
 		{
+			assert(0);
 			errmsg("Attempted to set node value to null string.\n");
 			return;
 		}
@@ -1696,11 +1745,14 @@ static void node_set_valist(node_t *pn, int nType, va_list valist)
             return;
         }
 
-		/* clean up */
-		node_cleanup( pn );
+		/* if set, free */
+		if( pn->psValue != NULL )
+		{
+			free( pn->psValue );
+		}
 
-		/* node_safe_copy psValue */
-		pn->psValue = node_safe_copy( psValue );
+		/* safe_copy psValue */
+		pn->psValue = safe_copy( psValue );
 
 		break;
 
@@ -1730,11 +1782,13 @@ static void node_set_valist(node_t *pn, int nType, va_list valist)
             return;
         }
 
-		/* clean up */
-		node_cleanup( pn );
+		if( pn->pbValue != NULL )
+		{
+			free( pn->pbValue );
+		}
 
 		/* allocate the buffer */
-		pn->pbValue = (data_t *)malloc( pn->nDataLength );
+		pn->pbValue = malloc( pn->nDataLength );
 		if( pn->pbValue == NULL ) 
 		{
 			errexit( "Out of memory: can't allocate data buffer in node_set.\n" );
@@ -1764,11 +1818,6 @@ static unsigned long node_hash( char * psKey)
 
 int node_is_valid( node_t* pn )
 {
-	assert( pn != NULL );
-
-	if( pn == NULL )
-		return 0;
-
      if( pn->nType == NODE_UNKNOWN )
      {
           return 0;
@@ -1776,234 +1825,6 @@ int node_is_valid( node_t* pn )
 
      /* else, it's valid */
      return 1;
-}
-
-static void node_cleanup( node_t * pn )
-{
-	int i = 0;
-
-	assert( pn != NULL );
-	if( pn == NULL )
-		return;
-
-	/* on node_cleanup, make sure all members are freed and zeroed */
-	switch( pn->nType )
-	{
-	case NODE_STRING:
-	case NODE_INT:
-	case NODE_REAL:
-		/* because of implicit conversion, must clear all scalar values together */
-		if( pn->psValue != NULL )
-			free( pn->psValue );
-		pn->psValue = NULL;
-		pn->nValue = 0;
-		pn->dfValue = 0.0;
-		break;
-	case NODE_DATA:
-		if( pn->pbValue != NULL )
-			free( pn->pbValue );
-		pn->pbValue = NULL;
-		pn->nDataLength = 0;
-		break;
-	case NODE_LIST:
-		node_free( pn->pnListHead );
-		pn->pnListHead = NULL;
-		pn->pnListTail = NULL;
-		break;
-	case NODE_HASH:
-		for( i = 0; i < pn->nHashBuckets; i ++ )
-		{
-			node_free( pn->ppnHashHeads[i] );
-		}
-		free( pn->ppnHashHeads );
-		free( pn->ppnHashTails );
-
-		pn->ppnHashHeads = NULL;
-		pn->ppnHashTails = NULL;
-
-		pn->nHashBuckets = 0;
-		pn->nHashElements = 0;
-		break;
-	}
-}
-
-/* node_hash_keys 
- * This function returns a newly-allocated list node containing 
- * a list of the key strings for hash pnHash. 
- */
-node_t * node_hash_keys( node_t * pnHash ) 
-{
-	node_t * pnList = NULL;
-	node_t * pn = NULL;
-
-	int i = 0;
-
-	assert( pnHash != NULL );
-	if( pnHash == NULL )
-		return NULL;
-
-	/* allocate a list node */
-	pnList = node_list_alloc();
-
-	/* if pnHash is not a hash node */
-	assert( pnHash->nType == NODE_HASH );
-	if( pnHash->nType != NODE_HASH )
-	{
-		/* return the list */
-		return pnList;
-	}
-
-	/* for each hash bucket */
-	for( i = 0; i < pnHash->nHashBuckets; i++ )
-	{
-		/* for each node in the bucket */
-		for( pn = pnHash->ppnHashHeads[i]; pn != NULL; pn = node_next( pn ) )
-		{
-			/* add the node's name to the list */
-			node_list_add( pnList, NODE_STRING, node_get_name( pn ) );
-		}
-	}
-
-	/* return the list */
-	return pnList;
-}
-
-static char * read_line( FILE * pfIn )
-{
-	int nBufferSize = 40;
-	char * psBuffer = NULL;
-	int nBytesRead = 0;
-	int nChar = 0;
-
-	/* check for end-of-file */
-	nChar = fgetc( pfIn );
-	if( feof( pfIn ) )
-		return NULL;
-	else
-		ungetc( nChar, pfIn );
-
-	/* allocate initial buffer */
-	psBuffer = (char *)malloc( nBufferSize );
-	if( psBuffer == NULL )
-		exit(1);
-
-	for(;;)
-	{
-		/* read a character */
-		nChar = fgetc( pfIn );
-
-		/* if the character was EOF */
-		if( nChar == EOF )
-			break;
-
-		/* increment the read count */
-		nBytesRead++;
-
-		/* if we're past the length of the buffer */
-		if( nBytesRead >= nBufferSize )
-		{
-			char * psNewBuffer = NULL;
-
-			/* increase the buffer size */
-			nBufferSize *= 2;
-
-			/* reallocate the buffer */
-			psNewBuffer = (char *)malloc( nBufferSize );
-			if( psNewBuffer == NULL )
-				exit(1);
-
-			/* copy the old buffer onto the new one */
-			memcpy( psNewBuffer, psBuffer, (nBufferSize/2) );
-
-			free( psBuffer );
-			psBuffer = psNewBuffer;
-		}
-
-		/* store the character in the buffer */
-		psBuffer[ nBytesRead-1 ] = (char)nChar;
-
-		/* if the character was a newline */
-		if( nChar == '\n' )
-			break;
-	}
-
-	/* terminate the buffer */
-	psBuffer[ nBytesRead ] = '\0';
-
-	/* return the read string */
-	return psBuffer;
-}
-
-static char * node_escape( char * psUnescaped )
-{
-	char * psEscaped = NULL;
-	char * psE = NULL;
-	char * psU = NULL;
-
-	if( psUnescaped == NULL )
-		return NULL;
-
-	psEscaped = (char *)malloc( 3*strlen(psUnescaped) + 1 );
-	if( psEscaped == NULL )
-		exit(1);
-
-	psE = psEscaped;
-	psU = psUnescaped;
-	while( *psU != '\0' )
-	{
-		switch( *psU )
-		{
-		case '%':
-		case ':':
-		case 0x0D:		/* <CR> */
-		case 0x0A:		/* <LF> */
-			/* write out a percent */
-			*psE++ = '%';
-
-			/* write out the hex code */
-			sprintf( psE, "%02X", *psU );
-			psU++;
-			psE += 2;
-
-			break;
-		default:
-			*psE++ = *psU++;
-		}
-	}
-	*psE = '\0';
-
-	return psEscaped;
-}
-
-static char * node_unescape( char * psEscaped )
-{
-	char * psUnescaped = node_safe_copy( psEscaped );
-	char * psE = psEscaped;
-	char * psU = psUnescaped;
-
-	int n = 0;
-
-	while( *psE != '\0' )
-	{
-		switch( *psE )
-		{
-		case '%':
-			/* step over the percent */
-			psE++;
-
-			/* convert the hex code */
-			sscanf( psE, "%2X", &n );
-			*psU++ = (char)n;
-			psE += 2;
-
-			break;
-		default:
-			*psU++ = *psE++;
-		}
-	}
-	*psU = '\0';
-
-	return psUnescaped;
 }
 
 

@@ -1,0 +1,14 @@
+: {
+  One: 1
+  Two: 2.0
+  Three: DATA 5
+$ 00 01 02 03 04 05
+  Four: 'string data'
+  Five: 'With escape %41 %0D%0A'
+  Six: PTR 00000000
+  Seven: (
+    : 1
+	: 2
+  )
+  Ei%29ght: 8L
+}
