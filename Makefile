@@ -24,6 +24,8 @@ CXXTESTGEN       = $(PYTHON) $(CXXTESTDIR)\cxxtestgen.py
 #  - --have-eh/--abort-on-fail are nice when you have them
 CXXTESTGEN_FLAGS = --gui=Win32Gui --runner=ParenPrinter --have-eh --abort-on-fail
 
+ALL: runner.cpp git-version.h
+
 # How to generate the test runner, "runner.cpp"
 runner.cpp: $(TESTS)
 	$(CXXTESTGEN) $(CXXTESTGEN_FLAGS) -o $@ $(TESTS)
@@ -40,8 +42,6 @@ runU: "$(DIR)\runnerU.exe"
 
 
 SolutionDir = .
-
-ALL: runner.cpp
 
 
 
