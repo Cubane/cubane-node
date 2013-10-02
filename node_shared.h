@@ -11,7 +11,7 @@
 //#define USE_DL_MALLOC 0
 #else
 /* In release mode, we want the DL allocator for its superior efficiency */
-#define USE_DL_MALLOC 0
+//#define USE_DL_MALLOC 0
 #endif
 
 //uncomment below to debug the dlmalloc-using code
