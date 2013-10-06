@@ -33,7 +33,7 @@ extern "C" {
 #define NL_RELMODE "release"
 #endif
 
-#ifdef _WIN64
+#if _WIN64
 #define NL_PLATFORM "-x64"
 #else
 #define NL_PLATFORM ""

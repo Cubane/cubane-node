@@ -3,7 +3,7 @@
 TESTS            = test\*.h
 
 # Where the CxxTest distribution is unpacked
-CXXTESTDIR       = ..\..\cxxtest
+CXXTESTDIR       = ..\cxxtest
 
 # Check CXXTESTDIR
 !if !exist($(CXXTESTDIR)\cxxtestgen.pl)
