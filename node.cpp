@@ -247,7 +247,7 @@ NODE_API extern const int NODE_VERSION_MINOR = NODE_HEADER_VERSION_MINOR;
 #define VER_SUFFIX " (static)"
 #endif
 
-NODE_API const char * node_version_3_0() { return "Node version 3.0 " GIT_VERSION_SHORT VER_SUFFIX; }
+NODE_API const char * node_version_3_0() { return "Node version " GIT_VERSION_SHORT VER_SUFFIX; }
 
 static const char * node_cpp_revision = GIT_VERSION_SHORT;
 static const char * node_cpp_revision_long = GIT_VERSION_LONG;
