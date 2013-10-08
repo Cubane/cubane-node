@@ -4980,16 +4980,23 @@ void * NODE_INTERNAL_FUNC node_malloc( struct node_arena * , size_t cb )
 
 RETRY:
 	void * pv = NULL;
-#if defined(_DEBUG) && !defined(DEBUG_DL_MALLOC)
-	if( node_source_file == NULL )
-		pv = malloc( cb );
-	else
-		pv = _malloc_dbg( cb, _NORMAL_BLOCK, node_source_file, node_source_line );
-#else // dl_malloc 
+
+#if defined(USE_DL_MALLOC) || defined(DEBUG_DL_MALLOC)
 	/* round up to multiple of 4 */
 	cb = (cb + 3) & (~3);
 
 	pv = mspace_malloc( pArena->pSpace, cb );
+#else
+
+#if defined(_DEBUG)
+	if( node_source_file == NULL )
+		pv = malloc( cb );
+	else
+		pv = _malloc_dbg( cb, _NORMAL_BLOCK, node_source_file, node_source_line );
+#else
+	pv = malloc( cb );
+#endif
+
 #endif
 
 	if( pv == NULL ) 
