@@ -15,6 +15,10 @@ unsigned int node_hashA( const char * psKey );
 unsigned int node_hashW( const wchar_t * psKey );
 
 #include "node_lookup2.h"
+
+#ifndef CP_UTF8
+#define CP_UTF8 65001
+#endif
  
 #ifdef __cplusplus
 }

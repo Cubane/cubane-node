@@ -117,7 +117,7 @@ typedef void (*node_assert_func_internal_t)( void * psExpr, const char * psFile,
 
 struct node_tls
 {
-	node_tls() : nCodePage(CP_ACP), pfError(NULL), pfMemory(NULL), pfAssert(NULL), pArena(&g_GlobalArena), psSourceFile(NULL), nSourceLine(-1) {}
+	node_tls() : nCodePage(CP_UTF8), pfError(NULL), pfMemory(NULL), pfAssert(NULL), pArena(&g_GlobalArena), psSourceFile(NULL), nSourceLine(-1) {}
 	int nCodePage;
 	node_error_func_t pfError;
 	node_memory_func_t pfMemory;
