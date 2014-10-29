@@ -358,7 +358,7 @@ static void NODE_INTERNAL_FUNC node_set_valist(node_t *pn, int nType, va_list va
 static node_t * NODE_INTERNAL_FUNC node_add_common( node_arena * pArena, int nType, va_list valist );
 
 static void NODE_INTERNAL_FUNC node_set_int( node_t * pn, int nValue );
-static void NODE_INTERNAL_FUNC node_set_int64( node_t * pn, __int64 nValue );
+static void NODE_INTERNAL_FUNC node_set_int64( node_t * pn, int64_t nValue );
 static void NODE_INTERNAL_FUNC node_set_real( node_t * pn, double dfValue );
 static void NODE_INTERNAL_FUNC node_set_stringA( node_t * pn, const char * psAValue );
 static void NODE_INTERNAL_FUNC node_set_stringW( node_t * pn, const wchar_t * psWValue );
@@ -976,7 +976,7 @@ int node_get_int( const node_t *pn)
 }
 
 /* returns the int value from the node */
-__int64 node_get_int64( const node_t *pn)
+int64_t node_get_int64( const node_t *pn)
 {
 	if( pn == NULL )
 	{
@@ -995,7 +995,7 @@ __int64 node_get_int64( const node_t *pn)
 
 	case NODE_REAL:	
 		/* convert the real to int and return that */
-		return (__int64)pn->dfValue;
+		return (int64_t)pn->dfValue;
 
 	case NODE_STRINGA:
 		/* convert the string to int and return that */
@@ -4000,7 +4000,7 @@ static void NODE_INTERNAL_FUNC node_set_int( node_t * pn, int nValue )
 	pn->nType = NODE_INT;
 }
 
-static void NODE_INTERNAL_FUNC node_set_int64( node_t * pn, __int64 nValue )
+static void NODE_INTERNAL_FUNC node_set_int64( node_t * pn, int64_t nValue )
 {
 	/* clean up */
 	node_cleanup( pn );
@@ -4246,7 +4246,7 @@ static void NODE_INTERNAL_FUNC node_set_valist(node_t * pn, int nType, va_list v
 		break;
 
 	case NODE_INT64:
-		node_set_int64( pn, va_arg(valist, __int64) );
+		node_set_int64( pn, va_arg(valist, int64_t) );
 		break;
 
 	case NODE_REAL:

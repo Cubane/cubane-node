@@ -167,7 +167,7 @@ struct __node
 			{
 			double dfValue; 			/* double value if real type or coerced */
 
-			__int64 n64Value;			/* 64-bit integer value */
+			int64_t n64Value;			/* 64-bit integer value */
 
 			/* int data */
 			int nValue; 				/* int value if int type or coerced */
@@ -275,7 +275,7 @@ int node_get_int( const node_t * pn );
 double node_get_real( const node_t * pn );
 
 /** returns the int64 value from the node */
-__int64 node_get_int64( const node_t * pn );
+int64_t node_get_int64( const node_t * pn );
 
 /** returns the 'A' (narrow) string value from the node */
 NODE_CONSTOUT char * node_get_stringA( node_t * pn );
