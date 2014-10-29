@@ -2,11 +2,6 @@
 #ifndef NODE_SHARED_H
 #define NODE_SHARED_H
 
-/* using the MSFT allocator */
-#define _CRTDBG_MAP_ALLOC 1
-#include <crtdbg.h>
-
-
 #ifdef __cplusplus
 extern "C" {
 #endif
