@@ -74,9 +74,11 @@ void node_mutex_unlock(node_mutex *nm) {
   LeaveCriticalSection( nm );
 }
 #else
+#include <pthread.h>
+
 #define node_mutex pthread_mutex_t
 int node_mutex_init(node_mutex * nm) {
-  return pthread_mutex_init(nm);
+  return pthread_mutex_init(nm, 0);
 }
 void node_mutex_lock(node_mutex *nm) {
   pthread_mutex_lock( nm );
@@ -250,7 +252,7 @@ class node_lock
 {
 	node_mutex * m_cs;
 public:
-  node_lock( node_mutex *cs ) : m_cs(cs) {node_mutex_lock(m_)cs);}
+  node_lock( node_mutex *cs ) : m_cs(cs) {node_mutex_lock(m_cs);}
   ~node_lock() { node_mutex_unlock(m_cs); }
 };
 
