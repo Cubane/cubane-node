@@ -16,16 +16,6 @@
 extern "C" {
 #endif
 
-#ifdef NODE_STATIC
-#define NODE_API
-#else /* not static */
-#ifdef NODE_DLL
-#define NODE_API	__declspec(dllexport)
-#else
-#define NODE_API	__declspec(dllimport)
-#endif
-#endif
-
 // specify library to link
 #ifdef _DEBUG 
 #define NL_RELMODE "debug"
@@ -61,12 +51,12 @@ extern "C" {
 #define NODE_HEADER_VERSION_MAJOR		3
 #define NODE_HEADER_VERSION_MINOR		0
 
-NODE_API extern const int NODE_VERSION_MAJOR;
-NODE_API extern const int NODE_VERSION_MINOR;
+extern const int NODE_VERSION_MAJOR;
+extern const int NODE_VERSION_MINOR;
 
 #define node_version()		node_version_3_0()
 
-NODE_API const char * node_version_3_0();
+const char * node_version_3_0();
 
 /*******************************
  Node Library #defined Constants
@@ -247,178 +237,178 @@ struct __node;
  ****************/
 
 /** allocate memory for a new node and return a pointer */
-NODE_API node_t * node_alloc();
+node_t * node_alloc();
 
 /** free memory associated with a node, including children and neighbours */
-NODE_API void node_free(node_t *pn);
+void node_free(node_t *pn);
 
 /** allocate an empty list node */
-NODE_API node_t * node_list_alloc();
+node_t * node_list_alloc();
 
 /** allocate an empty hash node */
-NODE_API node_t * node_hash_alloc();
+node_t * node_hash_alloc();
 
 /** allocate an empty hash node with a user-specified number of buckets */
-NODE_API node_t * node_hash_alloc2( int nHashBuckets );
+node_t * node_hash_alloc2( int nHashBuckets );
 
 /*****************
  Setting Functions
  *****************/
 
 /** set the value of an existing node */ 
-NODE_API node_t * node_set( node_t * pn, int nType, ... );
+node_t * node_set( node_t * pn, int nType, ... );
 
 /** set the value of an existing node to NODE_DATA type */ 
-NODE_API node_t * node_set_data( node_t * pn, int nLength, const void * pb );
+node_t * node_set_data( node_t * pn, int nLength, const void * pb );
 
 /*****************
  Reading Functions
  *****************/
 
 /** returns the node's type */
-NODE_API int node_get_type( const node_t * pn );
+int node_get_type( const node_t * pn );
 
 /** returns the int value from the node */
-NODE_API int node_get_int( const node_t * pn );
+int node_get_int( const node_t * pn );
 
 /** returns the real value from the node */
-NODE_API double node_get_real( const node_t * pn );
+double node_get_real( const node_t * pn );
 
 /** returns the int64 value from the node */
-NODE_API __int64 node_get_int64( const node_t * pn );
+__int64 node_get_int64( const node_t * pn );
 
 /** returns the 'A' (narrow) string value from the node */
-NODE_API NODE_CONSTOUT char * node_get_stringA( node_t * pn );
+NODE_CONSTOUT char * node_get_stringA( node_t * pn );
 
 /** returns the 'W' (UTF-16) string value from the node */
-NODE_API NODE_CONSTOUT wchar_t * node_get_stringW( node_t * pn );
+NODE_CONSTOUT wchar_t * node_get_stringW( node_t * pn );
 
 /** returns the data value from the node */
-NODE_API NODE_CONSTOUT data_t * node_get_data( const node_t * pn, int * pnLength );
+NODE_CONSTOUT data_t * node_get_data( const node_t * pn, int * pnLength );
 
 /** returns the number of elements in the node (list/hash only) */
-NODE_API int node_get_elements( const node_t * pn );
+int node_get_elements( const node_t * pn );
 
 /** returns the pointer value from the node */
-NODE_API void * node_get_ptr( const node_t * pn );
+void * node_get_ptr( const node_t * pn );
 
 /**************
  List Functions
  **************/
 
 /** add a new node to the end of a list; similar variable arguments to node_set */
-NODE_API node_t * node_list_add( node_t * pnList, int nType, ... );
+node_t * node_list_add( node_t * pnList, int nType, ... );
 
 /** delete a node from within a list */
-NODE_API void node_list_delete( node_t * pnList, node_t * pnToDelete );
+void node_list_delete( node_t * pnList, node_t * pnToDelete );
 
 /** returns the first node of a list */
-NODE_API node_t * node_first( const node_t * pnList );
+node_t * node_first( const node_t * pnList );
 
 /** returns the next node in a list or hash bucket chain */
-NODE_API node_t * node_next( const node_t * pn );
+node_t * node_next( const node_t * pn );
 
 /* Stack functions: treating the list as a stack */
 /** pushes a node onto the front of a list */
-NODE_API node_t * node_push( node_t * pnList, int nType, ... );
+node_t * node_push( node_t * pnList, int nType, ... );
 
 /** pops a node off the front of a list */
-NODE_API node_t * node_pop( node_t * pnList );
+node_t * node_pop( node_t * pnList );
 
 /**************
  Hash Functions
  **************/
 
 /** add a node to a hash; similar variable arguments to node_set */
-NODE_API node_t * node_hash_addA( node_t * pnHash, const char * psKey, int nType, ... );
+node_t * node_hash_addA( node_t * pnHash, const char * psKey, int nType, ... );
 /** add a node to a hash; similar variable arguments to node_set */
-NODE_API node_t * node_hash_addW( node_t * pnHash, const wchar_t * psKey, int nType, ... );
+node_t * node_hash_addW( node_t * pnHash, const wchar_t * psKey, int nType, ... );
 
 /** delete a node from within a hash */
-NODE_API void node_hash_delete( node_t * pnHash, node_t * pnToDelete );
+void node_hash_delete( node_t * pnHash, node_t * pnToDelete );
 
 /** get a node (by name) from a hash */
-NODE_API node_t * node_hash_getA( const node_t * pnHash, const char * psKey );
+node_t * node_hash_getA( const node_t * pnHash, const char * psKey );
 /** get a node (by name) from a hash */
-NODE_API node_t * node_hash_getW( const node_t * pnHash, const wchar_t * psKey );
+node_t * node_hash_getW( const node_t * pnHash, const wchar_t * psKey );
 
 /**************
  Name Functions
  **************/
 
 /** set the name of a node */
-NODE_API void node_set_nameA( node_t * pn, const char * psName );
+void node_set_nameA( node_t * pn, const char * psName );
 /** set the name of a node */
-NODE_API void node_set_nameW( node_t * pn, const wchar_t * psName );
+void node_set_nameW( node_t * pn, const wchar_t * psName );
 
 /** get the name of node */
-NODE_API NODE_CONSTOUT char * node_get_nameA( const node_t * pn);
+NODE_CONSTOUT char * node_get_nameA( const node_t * pn);
 /** get the name of node */
-NODE_API NODE_CONSTOUT wchar_t * node_get_nameW( const node_t * pn);
+NODE_CONSTOUT wchar_t * node_get_nameW( const node_t * pn);
 
 /*****************************
  Dumping and Parsing Functions
  *****************************/
 
 /** dump the node to a file */
-NODE_API void node_dumpA( const node_t * pn, FILE * pfOut, int nOptions);
+void node_dumpA( const node_t * pn, FILE * pfOut, int nOptions);
 
 /** dump the node to a file */
-NODE_API void node_dumpW( const node_t * pn, FILE * pfOut, int nOptions);
+void node_dumpW( const node_t * pn, FILE * pfOut, int nOptions);
 
 /** read a node from a file */
-NODE_API int node_parseA(FILE *pfIn, node_t ** ppn);
+int node_parseA(FILE *pfIn, node_t ** ppn);
 
 /** read a node from a file */
-NODE_API int node_parseW(FILE *pfIn, node_t ** ppn);
+int node_parseW(FILE *pfIn, node_t ** ppn);
 
 /** read a node from a string */
-NODE_API int node_parse_from_stringA( const char * ps, node_t ** ppn );
+int node_parse_from_stringA( const char * ps, node_t ** ppn );
 
 /** read a node from a string */
-NODE_API int node_parse_from_stringW( const wchar_t * ps, node_t ** ppn );
+int node_parse_from_stringW( const wchar_t * ps, node_t ** ppn );
 
 /** read a node from an unterminated string, length supplied */
-NODE_API int node_parse_from_dataA( const void * pv, size_t nBytes, node_t ** ppn );
+int node_parse_from_dataA( const void * pv, size_t nBytes, node_t ** ppn );
 
 /** read a node from an unterminated string, length supplied */
-NODE_API int node_parse_from_dataW( const void * pv, size_t nBytes, node_t ** ppn );
+int node_parse_from_dataW( const void * pv, size_t nBytes, node_t ** ppn );
 
 /*****************
  Utility Functions
  *****************/
 
 /** deep copy a node */
-NODE_API node_t * node_copy( const node_t * pn );
+node_t * node_copy( const node_t * pn );
 
 /** returns true if the node has a valid type and is suitable for adding
    to a list, etc. */
-NODE_API int node_is_valid( const node_t * pn );
+int node_is_valid( const node_t * pn );
 
 /** returns newly-allocated list node containing keys of hash */
-NODE_API node_t * node_hash_keysA( const node_t * pnHash );
+node_t * node_hash_keysA( const node_t * pnHash );
 
 /** returns newly-allocated list node containing keys of hash */
-NODE_API node_t * node_hash_keysW( const node_t * pnHash );
+node_t * node_hash_keysW( const node_t * pnHash );
 
 /** set codepage for internal ASCII/wide character conversions */
-NODE_API void node_set_codepage( int nCodePage );
+void node_set_codepage( int nCodePage );
 
 /** get codepage for internal ASCII/wide character conversions */
-NODE_API int node_get_codepage();
+int node_get_codepage();
 
 /** set debug state */
-NODE_API void node_set_debug( int nDebug );
+void node_set_debug( int nDebug );
 
 /** get debug state */
-NODE_API int node_get_debug();
+int node_get_debug();
 
 #ifdef _DEBUG
 /** set hash load factor limit */
-NODE_API void node_set_loadlimit( double dfLoadLimit );
+void node_set_loadlimit( double dfLoadLimit );
 
 /** get hash load factor limit */
-NODE_API double node_get_loadlimit();
+double node_get_loadlimit();
 
 /* for profiling hash performance */
 #define node_hash_alloc_d()		node_hash_alloc_dbg( __FILE__, __LINE__ )
@@ -427,56 +417,56 @@ NODE_API double node_get_loadlimit();
 #endif
 
 /** clean up all module storage */
-NODE_API void node_finalize();
+void node_finalize();
 
-NODE_API node_arena_t node_create_arena( size_t size );
+node_arena_t node_create_arena( size_t size );
 
-NODE_API node_arena_t node_get_arena();
+node_arena_t node_get_arena();
 
-NODE_API node_arena_t node_set_arena( node_arena_t pNewArena );
+node_arena_t node_set_arena( node_arena_t pNewArena );
 
-NODE_API size_t node_delete_arena( node_arena_t pToDelete );
+size_t node_delete_arena( node_arena_t pToDelete );
 /**************************************
  Debugging analogues of above functions
  **************************************/
 
 #ifdef _DEBUG
 
-NODE_API node_t * node_alloc_dbg( const char *psFile, int nLine );
+node_t * node_alloc_dbg( const char *psFile, int nLine );
 
-NODE_API node_t * node_list_alloc_dbg( const char * psFile, int nLine );
+node_t * node_list_alloc_dbg( const char * psFile, int nLine );
 
-NODE_API node_t * node_hash_alloc_dbg( const char * psFile, int nLine );
-NODE_API node_t * node_hash_alloc2_dbg( int nHashBuckets, const char * psFile, int nLine );
+node_t * node_hash_alloc_dbg( const char * psFile, int nLine );
+node_t * node_hash_alloc2_dbg( int nHashBuckets, const char * psFile, int nLine );
 
-NODE_API node_t * node_set_dbg( const char *psFile, int nLine, node_t * pn, int nType, ... );
-NODE_API node_t * node_set_data_dbg( const char *psFile, int nLine, node_t * pn, int nLength, const void * pb );
+node_t * node_set_dbg( const char *psFile, int nLine, node_t * pn, int nType, ... );
+node_t * node_set_data_dbg( const char *psFile, int nLine, node_t * pn, int nLength, const void * pb );
 
-NODE_API NODE_CONSTOUT char * node_get_string_dbgA( const char *psFile, int nLine, node_t * pn );
-NODE_API NODE_CONSTOUT wchar_t * node_get_string_dbgW( const char *psFile, int nLine, node_t * pn );
+NODE_CONSTOUT char * node_get_string_dbgA( const char *psFile, int nLine, node_t * pn );
+NODE_CONSTOUT wchar_t * node_get_string_dbgW( const char *psFile, int nLine, node_t * pn );
 
-NODE_API node_t * node_list_add_dbg( const char *psFile, int nLine, node_t * pnList, int nType, ... );
-NODE_API node_t * node_push_dbg( const char *psFile, int nLine, node_t * pnList, int nType, ... );
+node_t * node_list_add_dbg( const char *psFile, int nLine, node_t * pnList, int nType, ... );
+node_t * node_push_dbg( const char *psFile, int nLine, node_t * pnList, int nType, ... );
 
-NODE_API node_t * node_hash_add_dbgA( const char *psFile, int nLine, node_t * pnHash, const char * psKey, int nType, ... );
-NODE_API node_t * node_hash_add_dbgW( const char *psFile, int nLine, node_t * pnHash, const wchar_t * psKey, int nType, ... );
+node_t * node_hash_add_dbgA( const char *psFile, int nLine, node_t * pnHash, const char * psKey, int nType, ... );
+node_t * node_hash_add_dbgW( const char *psFile, int nLine, node_t * pnHash, const wchar_t * psKey, int nType, ... );
 
-NODE_API void node_set_name_dbgA( const char *psFile, int nLine, node_t * pn, const char * psName );
-NODE_API void node_set_name_dbgW( const char *psFile, int nLine, node_t * pn, const wchar_t * psName );
+void node_set_name_dbgA( const char *psFile, int nLine, node_t * pn, const char * psName );
+void node_set_name_dbgW( const char *psFile, int nLine, node_t * pn, const wchar_t * psName );
 
-NODE_API int node_parse_dbgA( const char *psFile, int nLine, FILE *pfIn, node_t ** ppn);
-NODE_API int node_parse_dbgW( const char *psFile, int nLine, FILE *pfIn, node_t ** ppn);
+int node_parse_dbgA( const char *psFile, int nLine, FILE *pfIn, node_t ** ppn);
+int node_parse_dbgW( const char *psFile, int nLine, FILE *pfIn, node_t ** ppn);
 
-NODE_API int node_parse_from_string_dbgA( const char *psFile, int nLine, const char * ps, node_t ** ppn );
-NODE_API int node_parse_from_string_dbgW( const char *psFile, int nLine, const wchar_t * ps, node_t ** ppn );
+int node_parse_from_string_dbgA( const char *psFile, int nLine, const char * ps, node_t ** ppn );
+int node_parse_from_string_dbgW( const char *psFile, int nLine, const wchar_t * ps, node_t ** ppn );
 
-NODE_API int node_parse_from_data_dbgA( const char *psFile, int nLine, const void * pv, size_t nBytes, node_t ** ppn );
-NODE_API int node_parse_from_data_dbgW( const char *psFile, int nLine, const void * pv, size_t nBytes, node_t ** ppn );
+int node_parse_from_data_dbgA( const char *psFile, int nLine, const void * pv, size_t nBytes, node_t ** ppn );
+int node_parse_from_data_dbgW( const char *psFile, int nLine, const void * pv, size_t nBytes, node_t ** ppn );
 
-NODE_API node_t * node_copy_dbg( const char *psFile, int nLine, const node_t * pn );
+node_t * node_copy_dbg( const char *psFile, int nLine, const node_t * pn );
 
-NODE_API node_t * node_hash_keys_dbgA( const char *psFile, int nLine, const node_t * pnHash );
-NODE_API node_t * node_hash_keys_dbgW( const char *psFile, int nLine, const node_t * pnHash );
+node_t * node_hash_keys_dbgA( const char *psFile, int nLine, const node_t * pnHash );
+node_t * node_hash_keys_dbgW( const char *psFile, int nLine, const node_t * pnHash );
 
 #endif
 
@@ -491,7 +481,7 @@ typedef void (*node_assert_func_t)( void * psExpr, void * psFile, unsigned int n
 #define NODE_MEMORY_FAIL	0
 #define NODE_MEMORY_RETRY	1
 
-NODE_API void node_set_error_funcs( node_error_func_t pErrFunc, node_memory_func_t pMemFunc, 
+void node_set_error_funcs( node_error_func_t pErrFunc, node_memory_func_t pMemFunc, 
 								    node_assert_func_t pAssertFunc );
 
 /***********************************

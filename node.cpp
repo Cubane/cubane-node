@@ -8,10 +8,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
-#include <windows.h>
 #include <stddef.h>
-#include <winbase.h>
-#include <crtdbg.h>
 
 #define NODE_TRANSPARENT 1
 
@@ -238,8 +235,8 @@ public:
  ****************/
 
 /* explicitly synchronize with header so client apps can assert( NODE_HEADER_VERSION_MAJOR == NODE_VERSION_MAJOR ) */
-NODE_API extern const int NODE_VERSION_MAJOR = NODE_HEADER_VERSION_MAJOR;
-NODE_API extern const int NODE_VERSION_MINOR = NODE_HEADER_VERSION_MINOR;
+extern const int NODE_VERSION_MAJOR = NODE_HEADER_VERSION_MAJOR;
+extern const int NODE_VERSION_MINOR = NODE_HEADER_VERSION_MINOR;
 
 #ifdef _DEBUG
 #define VER_SUFFIX " (debug,static)"
@@ -247,7 +244,7 @@ NODE_API extern const int NODE_VERSION_MINOR = NODE_HEADER_VERSION_MINOR;
 #define VER_SUFFIX " (static)"
 #endif
 
-NODE_API const char * node_version_3_0() { return "Node version " GIT_VERSION_SHORT VER_SUFFIX; }
+const char * node_version_3_0() { return "Node version " GIT_VERSION_SHORT VER_SUFFIX; }
 
 static const char * node_cpp_revision = GIT_VERSION_SHORT;
 static const char * node_cpp_revision_long = GIT_VERSION_LONG;
@@ -506,7 +503,7 @@ class NodeStringWReader;
  *********/
 
 /* returns the first node of a list */
-NODE_API node_t * node_first( const node_t * pnList )
+node_t * node_first( const node_t * pnList )
 {
 	if( pnList == NULL )
 	{
@@ -528,7 +525,7 @@ NODE_API node_t * node_first( const node_t * pnList )
 }
 
 /* returns the next node in a list or hash bucket chain */
-NODE_API node_t * node_next( const node_t * pn )
+node_t * node_next( const node_t * pn )
 {
 	if( pn == NULL )
 	{
@@ -551,12 +548,12 @@ NODE_API node_t * node_next( const node_t * pn )
  ****************/
 
 /* allocate memory for a new node and return a pointer */
-NODE_API node_t * node_alloc()
+node_t * node_alloc()
 {
 	return node_alloc_internal( node_pArena );
 }
 
-NODE_API node_t * node_alloc_dbg( const char * psFile, int nLine )
+node_t * node_alloc_dbg( const char * psFile, int nLine )
 {
 	set_debug_allocator s( psFile, nLine );
 	return node_alloc_internal( node_pArena );
@@ -621,7 +618,7 @@ static node_t * NODE_INTERNAL_FUNC node_alloc_internal( node_arena * pArena )
 }
 
 /* free memory associated with a node, including children and neighbours */
-NODE_API void node_free(node_t *pn)
+void node_free(node_t *pn)
 {
 	if( pn == NULL )
 		return;
@@ -784,7 +781,7 @@ static void NODE_INTERNAL_FUNC node_hash_init( node_t * pn, int nHashBuckets )
 
 }
 
-NODE_API node_t * node_list_alloc()
+node_t * node_list_alloc()
 {
 	node_t * pn = NULL;
 	
@@ -795,14 +792,14 @@ NODE_API node_t * node_list_alloc()
 	return pn;
 }
 
-NODE_API node_t * node_list_alloc_dbg( const char * psFile, int nLine )
+node_t * node_list_alloc_dbg( const char * psFile, int nLine )
 {
 	set_debug_allocator s( psFile, nLine );
 
 	return node_list_alloc();
 }
 
-NODE_API node_t * node_hash_alloc()
+node_t * node_hash_alloc()
 {
 	node_t * pn = node_alloc_internal( node_pArena );
 	
@@ -811,7 +808,7 @@ NODE_API node_t * node_hash_alloc()
 	return pn;
 }
 
-NODE_API node_t * node_hash_alloc2( int nHashBuckets )
+node_t * node_hash_alloc2( int nHashBuckets )
 {
 	node_t * pn = node_alloc_internal( node_pArena );
 	
@@ -829,7 +826,7 @@ static void NODE_INTERNAL_FUNC node_hash_store_debug( node_t * pn, const char * 
 	pn->psHashAllocated = node_safe_copyA( pn->pArena, acFile );
 }
 
-NODE_API node_t * node_hash_alloc_dbg( const char * psFile, int nLine )
+node_t * node_hash_alloc_dbg( const char * psFile, int nLine )
 {
 	set_debug_allocator s( psFile, nLine );
 
@@ -843,7 +840,7 @@ NODE_API node_t * node_hash_alloc_dbg( const char * psFile, int nLine )
 	return pn;
 }
 
-NODE_API node_t * node_hash_alloc2_dbg( int nHashBuckets, const char * psFile, int nLine )
+node_t * node_hash_alloc2_dbg( int nHashBuckets, const char * psFile, int nLine )
 {
 	set_debug_allocator s( psFile, nLine );
 
@@ -858,13 +855,13 @@ NODE_API node_t * node_hash_alloc2_dbg( int nHashBuckets, const char * psFile, i
 }
 
 /** set hash load factor limit */
-NODE_API void node_set_loadlimit( double dfLoadLimit )
+void node_set_loadlimit( double dfLoadLimit )
 {
 	node_dfLoadLimit = dfLoadLimit;
 }
 
 /** get hash load factor limit */
-NODE_API double node_get_loadlimit()
+double node_get_loadlimit()
 {
 	return node_dfLoadLimit;
 }
@@ -875,7 +872,7 @@ NODE_API double node_get_loadlimit()
  Setting Functions
  *****************/
 
-NODE_API node_t * node_set_dbg( const char * psFile, int nLine, node_t * pn, int nType, ... )
+node_t * node_set_dbg( const char * psFile, int nLine, node_t * pn, int nType, ... )
 {
 	set_debug_allocator s( psFile, nLine );
 
@@ -894,7 +891,7 @@ NODE_API node_t * node_set_dbg( const char * psFile, int nLine, node_t * pn, int
 }
 
 /* node_set is a wrapper for the private function node_set_valist */ 
-NODE_API node_t * node_set(node_t * pn, int nType, ...)
+node_t * node_set(node_t * pn, int nType, ...)
 {
 	va_list valist;
 
@@ -915,7 +912,7 @@ NODE_API node_t * node_set(node_t * pn, int nType, ...)
  *****************/
 
 /* returns the node's type */
-NODE_API int node_get_type( const node_t * pn )
+int node_get_type( const node_t * pn )
 {
 	if( pn == NULL )
 	{
@@ -927,7 +924,7 @@ NODE_API int node_get_type( const node_t * pn )
 }
 
 /* returns the int value from the node */
-NODE_API int node_get_int( const node_t *pn)
+int node_get_int( const node_t *pn)
 {
 	if( pn == NULL )
 	{
@@ -979,7 +976,7 @@ NODE_API int node_get_int( const node_t *pn)
 }
 
 /* returns the int value from the node */
-NODE_API __int64 node_get_int64( const node_t *pn)
+__int64 node_get_int64( const node_t *pn)
 {
 	if( pn == NULL )
 	{
@@ -1031,7 +1028,7 @@ NODE_API __int64 node_get_int64( const node_t *pn)
 }
 
 /* returns the real value from the node */
-NODE_API double node_get_real( const node_t *pn )
+double node_get_real( const node_t *pn )
 {
 	if( pn == NULL )
 	{
@@ -1083,14 +1080,14 @@ NODE_API double node_get_real( const node_t *pn )
 }
 
 /* returns the A string value from the node */
-NODE_API NODE_CONSTOUT char * node_get_string_dbgA( const char * psFile, int nLine, node_t * pn )
+NODE_CONSTOUT char * node_get_string_dbgA( const char * psFile, int nLine, node_t * pn )
 {
 	set_debug_allocator s( psFile, nLine );
 
 	return node_get_stringA( pn );
 }
 
-NODE_API NODE_CONSTOUT char * node_get_stringA( node_t *pn )
+NODE_CONSTOUT char * node_get_stringA( node_t *pn )
 {
 	char acBuffer[32] = {0};
 
@@ -1178,14 +1175,14 @@ NODE_API NODE_CONSTOUT char * node_get_stringA( node_t *pn )
 }
 
 /* returns the W string value from the node */
-NODE_API NODE_CONSTOUT wchar_t * node_get_string_dbgW( const char * psFile, int nLine, node_t * pn )
+NODE_CONSTOUT wchar_t * node_get_string_dbgW( const char * psFile, int nLine, node_t * pn )
 {
 	set_debug_allocator s( psFile, nLine );
 
 	return node_get_stringW( pn );
 }
 
-NODE_API NODE_CONSTOUT wchar_t * node_get_stringW(node_t *pn)
+NODE_CONSTOUT wchar_t * node_get_stringW(node_t *pn)
 {
 	wchar_t acBuffer[32] = {0};
 
@@ -1270,7 +1267,7 @@ NODE_API NODE_CONSTOUT wchar_t * node_get_stringW(node_t *pn)
 
 
 /* returns the data value from the node */
-NODE_API NODE_CONSTOUT data_t * node_get_data( const node_t *pn, int * pnLength )
+NODE_CONSTOUT data_t * node_get_data( const node_t *pn, int * pnLength )
 {
 	if( pn == NULL )
 	{
@@ -1322,7 +1319,7 @@ NODE_API NODE_CONSTOUT data_t * node_get_data( const node_t *pn, int * pnLength 
 
 
 /* returns the number of elements in the node (list/hash only) */
-NODE_API int node_get_elements( const node_t * pn )
+int node_get_elements( const node_t * pn )
 {
 	if( pn == NULL )
 	{
@@ -1347,7 +1344,7 @@ NODE_API int node_get_elements( const node_t * pn )
 }
 
 /* returns the pointer value from the node */
-NODE_API void * node_get_ptr( const node_t * pn )
+void * node_get_ptr( const node_t * pn )
 {
 	if( pn == NULL )
 	{
@@ -1391,7 +1388,7 @@ NODE_API void * node_get_ptr( const node_t * pn )
  **************/
 
 /* add a new node to the end of a list; similar variable arguments to node_set */
-NODE_API node_t * node_list_add_dbg( const char * psFile, int nLine, node_t * pnList, int nType, ...)
+node_t * node_list_add_dbg( const char * psFile, int nLine, node_t * pnList, int nType, ...)
 {
 	set_debug_allocator s( psFile, nLine );
 
@@ -1410,7 +1407,7 @@ NODE_API node_t * node_list_add_dbg( const char * psFile, int nLine, node_t * pn
 }
 
 
-NODE_API node_t * node_list_add(node_t * pnList, int nType, ...)
+node_t * node_list_add(node_t * pnList, int nType, ...)
 {
 	node_t * pnNew = NULL;
 	va_list valist;
@@ -1467,7 +1464,7 @@ static void NODE_INTERNAL_FUNC node_list_add_internal( node_t * pnList, node_t *
 }
 
 /* deletes a node from a list */
-NODE_API void node_list_delete( node_t * pnList, node_t * pnToDelete )
+void node_list_delete( node_t * pnList, node_t * pnToDelete )
 {
 	if( pnList == NULL || pnToDelete == NULL )
 	{
@@ -1557,7 +1554,7 @@ static void NODE_INTERNAL_FUNC node_list_delete_internal( node_t * pnList, node_
 
 /* Stack functions: treating the list as a stack */
 /* pushes a node onto the front of a list */
-NODE_API node_t * node_push_dbg( const char * psFile, int nLine, node_t * pnList, int nType, ... )
+node_t * node_push_dbg( const char * psFile, int nLine, node_t * pnList, int nType, ... )
 {
 	set_debug_allocator s(psFile, nLine);
 
@@ -1573,7 +1570,7 @@ NODE_API node_t * node_push_dbg( const char * psFile, int nLine, node_t * pnList
 	return pnNew;
 }
 
-NODE_API node_t * node_push( node_t * pnList, int nType, ... )
+node_t * node_push( node_t * pnList, int nType, ... )
 {
 	va_list valist;
 
@@ -1632,7 +1629,7 @@ node_t * NODE_INTERNAL_FUNC node_push_internal( node_t * pnList, node_t * pnNew 
 }
 
 /* pops a node off the front of a list */
-NODE_API node_t * node_pop( node_t * pnList )
+node_t * node_pop( node_t * pnList )
 {
 	if( pnList == NULL )
 	{
@@ -1758,7 +1755,7 @@ static node_t * NODE_INTERNAL_FUNC node_add_common( node_arena * pArena, int nTy
 }
 
 /* add a node to a hash{} similar variable arguments to node_set */
-NODE_API node_t * node_hash_add_dbgA( const char * psFile, int nLine, node_t * pnHash, const char * psKey, int nType, ...)
+node_t * node_hash_add_dbgA( const char * psFile, int nLine, node_t * pnHash, const char * psKey, int nType, ...)
 {
 	set_debug_allocator s(psFile, nLine);
 
@@ -1775,7 +1772,7 @@ NODE_API node_t * node_hash_add_dbgA( const char * psFile, int nLine, node_t * p
 	return pn;
 }
 
-NODE_API node_t * node_hash_addA(node_t * pnHash, const char * psKey, int nType, ...)
+node_t * node_hash_addA(node_t * pnHash, const char * psKey, int nType, ...)
 {
 	va_list valist;
 
@@ -1882,7 +1879,7 @@ static void NODE_INTERNAL_FUNC node_hash_add_internal( node_t * pnHash, node_t *
 }
 
 /* add a node to a hash{} similar variable arguments to node_set */
-NODE_API node_t * node_hash_add_dbgW( const char * psFile, int nLine, node_t * pnHash, const wchar_t * psKey, int nType, ...)
+node_t * node_hash_add_dbgW( const char * psFile, int nLine, node_t * pnHash, const wchar_t * psKey, int nType, ...)
 {
 	set_debug_allocator s(psFile, nLine);
 
@@ -1897,7 +1894,7 @@ NODE_API node_t * node_hash_add_dbgW( const char * psFile, int nLine, node_t * p
 	return pnNew;
 }
 
-NODE_API node_t * node_hash_addW( node_t * pnHash, const wchar_t * psKey, int nType, ... )
+node_t * node_hash_addW( node_t * pnHash, const wchar_t * psKey, int nType, ... )
 {
 	va_list valist;
 
@@ -2022,7 +2019,7 @@ static void NODE_INTERNAL_FUNC hash_rebalance( node_t * pnHash )
 #endif
 
 /* get a node (by name) from a hash */
-NODE_API node_t * node_hash_getA( const node_t * pnHash, const char * psKey)
+node_t * node_hash_getA( const node_t * pnHash, const char * psKey)
 {
 	if( pnHash == NULL || psKey == NULL )
 	{
@@ -2081,7 +2078,7 @@ static node_t * NODE_INTERNAL_FUNC node_hash_getA_internal( const node_t * pnHas
 }
 
 /* get a node (by name) from a hash */
-NODE_API node_t * node_hash_getW( const node_t * pnHash, const wchar_t * psKey )
+node_t * node_hash_getW( const node_t * pnHash, const wchar_t * psKey )
 {
 	if( pnHash == NULL || psKey == NULL )
 	{
@@ -2139,7 +2136,7 @@ static node_t * NODE_INTERNAL_FUNC node_hash_getW_internal( const node_t * pnHas
 	return NULL;
 }
 
-NODE_API void node_hash_delete( node_t * pnHash, node_t * pnToDelete )
+void node_hash_delete( node_t * pnHash, node_t * pnToDelete )
 {
 	if( pnHash == NULL || pnToDelete == NULL )
 	{
@@ -2222,13 +2219,13 @@ static void NODE_INTERNAL_FUNC node_hash_delete_internal( node_t * pnHash, node_
  **************/
 
 /* set the name of a node */
-NODE_API void node_set_name_dbgA( const char * psFile, int nLine, node_t * pn, const char * psName)
+void node_set_name_dbgA( const char * psFile, int nLine, node_t * pn, const char * psName)
 {
 	set_debug_allocator s(psFile, nLine);
 	node_set_nameA( pn, psName );
 }
 
-NODE_API void node_set_nameA(node_t * pn, const char * psName)
+void node_set_nameA(node_t * pn, const char * psName)
 {
 	if( pn == NULL )
 	{
@@ -2270,14 +2267,14 @@ static void NODE_INTERNAL_FUNC node_set_nameA_internal( node_t * pn, const char 
 }
 
 /* set the name of a node */
-NODE_API void node_set_name_dbgW( const char * psFile, int nLine, node_t * pn, const wchar_t * psName)
+void node_set_name_dbgW( const char * psFile, int nLine, node_t * pn, const wchar_t * psName)
 {
 	set_debug_allocator s(psFile, nLine);
 
 	node_set_nameW( pn, psName );
 }
 
-NODE_API void node_set_nameW(node_t * pn, const wchar_t * psName)
+void node_set_nameW(node_t * pn, const wchar_t * psName)
 {
 	if( pn == NULL )
 	{
@@ -2320,7 +2317,7 @@ static void NODE_INTERNAL_FUNC node_set_nameW_internal( node_t * pn, const wchar
 }
 
 /* get the name of node */
-NODE_API NODE_CONSTOUT char * node_get_nameA( const node_t * pn )
+NODE_CONSTOUT char * node_get_nameA( const node_t * pn )
 {
 	if( pn == NULL )
 	{
@@ -2331,7 +2328,7 @@ NODE_API NODE_CONSTOUT char * node_get_nameA( const node_t * pn )
 	return pn->psAName;
 }
 
-NODE_API NODE_CONSTOUT wchar_t * node_get_nameW( const node_t * pn)
+NODE_CONSTOUT wchar_t * node_get_nameW( const node_t * pn)
 {
 	if( pn == NULL )
 	{
@@ -2347,7 +2344,7 @@ NODE_API NODE_CONSTOUT wchar_t * node_get_nameW( const node_t * pn)
  *****************************/
 
 /* dump the node to a file */
-NODE_API void node_dumpA( const node_t * pn, FILE * pfOut, int nOptions )
+void node_dumpA( const node_t * pn, FILE * pfOut, int nOptions )
 {
 	if( pn == NULL || pfOut == NULL )
 	{
@@ -2636,7 +2633,7 @@ static inline void NODE_INTERNAL_FUNC node_write_spacesA( FILE * pfOut, int nSpa
 }
 
 /* dump the node to a file */
-NODE_API void node_dumpW( const node_t * pn, FILE * pfOut, int nOptions )
+void node_dumpW( const node_t * pn, FILE * pfOut, int nOptions )
 {
 	if( pn == NULL || pfOut == NULL )
 	{
@@ -3035,7 +3032,7 @@ public:
  Parsing Interface Functions
  ***************************/
 
-NODE_API int node_parseA( FILE * pfIn, node_t ** ppn )
+int node_parseA( FILE * pfIn, node_t ** ppn )
 {
 	if( pfIn == NULL || ppn == NULL )
 		return NP_INVALID;
@@ -3043,7 +3040,7 @@ NODE_API int node_parseA( FILE * pfIn, node_t ** ppn )
 	return node_parse_internal( pfIn, ppn, NODE_A );
 }
 
-NODE_API int node_parse_dbgA( const char * psFile, int nLine, FILE * pfIn, node_t ** ppn )
+int node_parse_dbgA( const char * psFile, int nLine, FILE * pfIn, node_t ** ppn )
 {
 	set_debug_allocator s(psFile, nLine);
 
@@ -3053,7 +3050,7 @@ NODE_API int node_parse_dbgA( const char * psFile, int nLine, FILE * pfIn, node_
 	return node_parse_internal( pfIn, ppn, NODE_A );
 }
 
-NODE_API int node_parseW( FILE * pfIn, node_t ** ppn )
+int node_parseW( FILE * pfIn, node_t ** ppn )
 {
 	if( pfIn == NULL || ppn == NULL )
 		return NP_INVALID;
@@ -3061,7 +3058,7 @@ NODE_API int node_parseW( FILE * pfIn, node_t ** ppn )
 	return node_parse_internal( pfIn, ppn, NODE_W );
 }
 
-NODE_API int node_parse_dbgW( const char * psFile, int nLine, FILE * pfIn, node_t ** ppn )
+int node_parse_dbgW( const char * psFile, int nLine, FILE * pfIn, node_t ** ppn )
 {
 	set_debug_allocator s(psFile, nLine);
 
@@ -3071,7 +3068,7 @@ NODE_API int node_parse_dbgW( const char * psFile, int nLine, FILE * pfIn, node_
 	return node_parse_internal( pfIn, ppn, NODE_W );
 }
 
-NODE_API int node_parse_from_stringA( const char * ps, node_t ** ppn )
+int node_parse_from_stringA( const char * ps, node_t ** ppn )
 {
 	if( ps == NULL || ppn == NULL )
 		return NP_INVALID;
@@ -3080,7 +3077,7 @@ NODE_API int node_parse_from_stringA( const char * ps, node_t ** ppn )
 	return node_parse_internalA( &nr, ppn, NODE_A );
 }
 
-NODE_API int node_parse_from_string_dbgA( const char * psFile, int nLine, const char * ps, node_t ** ppn )
+int node_parse_from_string_dbgA( const char * psFile, int nLine, const char * ps, node_t ** ppn )
 {
 	set_debug_allocator s(psFile, nLine);
 
@@ -3091,7 +3088,7 @@ NODE_API int node_parse_from_string_dbgA( const char * psFile, int nLine, const 
 	return node_parse_internalA( &nr, ppn, NODE_A );
 }
 
-NODE_API int node_parse_from_stringW( const wchar_t * ps, node_t ** ppn )
+int node_parse_from_stringW( const wchar_t * ps, node_t ** ppn )
 {
 	if( ps == NULL || ppn == NULL )
 		return NP_INVALID;
@@ -3100,7 +3097,7 @@ NODE_API int node_parse_from_stringW( const wchar_t * ps, node_t ** ppn )
 	return node_parse_internalW( &nr, ppn, NODE_W );
 }
 
-NODE_API int node_parse_from_string_dbgW( const char * psFile, int nLine, const wchar_t * ps, node_t ** ppn )
+int node_parse_from_string_dbgW( const char * psFile, int nLine, const wchar_t * ps, node_t ** ppn )
 {
 	set_debug_allocator s(psFile, nLine);
 
@@ -3132,7 +3129,7 @@ static int NODE_INTERNAL_FUNC node_parse_from_data_internal( const void * pv, si
 	}
 }
 
-NODE_API int node_parse_from_dataA( const void * pv, size_t nBytes, node_t ** ppn )
+int node_parse_from_dataA( const void * pv, size_t nBytes, node_t ** ppn )
 {
 	if( pv == NULL || ppn == NULL )
 		return NP_INVALID;
@@ -3140,7 +3137,7 @@ NODE_API int node_parse_from_dataA( const void * pv, size_t nBytes, node_t ** pp
 	return node_parse_from_data_internal( pv, nBytes, ppn, NODE_A );
 }
 
-NODE_API int node_parse_from_data_dbgA( const char * psFile, int nLine, const void * pv, size_t nBytes, node_t ** ppn )
+int node_parse_from_data_dbgA( const char * psFile, int nLine, const void * pv, size_t nBytes, node_t ** ppn )
 {
 	set_debug_allocator s(psFile, nLine);
 
@@ -3150,7 +3147,7 @@ NODE_API int node_parse_from_data_dbgA( const char * psFile, int nLine, const vo
 	return node_parse_from_data_internal( pv, nBytes, ppn, NODE_A );
 }
 
-NODE_API int node_parse_from_dataW( const void * pv, size_t nBytes, node_t ** ppn )
+int node_parse_from_dataW( const void * pv, size_t nBytes, node_t ** ppn )
 {
 	if( pv == NULL || ppn == NULL )
 		return NP_INVALID;
@@ -3158,7 +3155,7 @@ NODE_API int node_parse_from_dataW( const void * pv, size_t nBytes, node_t ** pp
 	return node_parse_from_data_internal( pv, nBytes, ppn, NODE_W );
 }
 
-NODE_API int node_parse_from_data_dbgW( const char * psFile, int nLine, const void * pv, size_t nBytes, node_t ** ppn )
+int node_parse_from_data_dbgW( const char * psFile, int nLine, const void * pv, size_t nBytes, node_t ** ppn )
 {
 	set_debug_allocator s(psFile, nLine);
 
@@ -3818,14 +3815,14 @@ PARSE_ERROR:
  *****************/
 
 /* deep copy a node */
-NODE_API node_t * node_copy_dbg( const char * psFile, int nLine, const node_t *pnSource )
+node_t * node_copy_dbg( const char * psFile, int nLine, const node_t *pnSource )
 {
 	set_debug_allocator s( psFile, nLine );
 
 	return node_copy( pnSource );
 }
 
-NODE_API node_t * node_copy( const node_t *pnSource )
+node_t * node_copy( const node_t *pnSource )
 {
 	/* if it's NULL, return NULL */
 	if( pnSource == NULL )
@@ -4139,13 +4136,13 @@ static void NODE_INTERNAL_FUNC node_set_stringW_internal( node_t * pn, const wch
 	pn->nType = NODE_STRINGW;
 }
 
-NODE_API node_t * node_set_data_dbg( const char * psFile, int nLine, node_t * pn, int nLength, const void * pbValue )
+node_t * node_set_data_dbg( const char * psFile, int nLine, node_t * pn, int nLength, const void * pbValue )
 {
 	set_debug_allocator s( psFile, nLine );
 	return node_set_data( pn, nLength, pbValue );
 }
 
-NODE_API node_t * node_set_data( node_t * pn, int nLength, const void * pvValue )
+node_t * node_set_data( node_t * pn, int nLength, const void * pvValue )
 {
 	const data_t * pbValue = reinterpret_cast<const data_t *>( pvValue );
 	if( nLength <= 0 )
@@ -4448,14 +4445,14 @@ static void NODE_INTERNAL_FUNC node_cleanup( node_t * pn )
  * This function returns a newly-allocated list node containing 
  * a list of the key strings for hash pnHash. 
  */
-NODE_API node_t * node_hash_keys_dbgA( const char * psFile, int nLine, const node_t * pnHash ) 
+node_t * node_hash_keys_dbgA( const char * psFile, int nLine, const node_t * pnHash ) 
 {
 	set_debug_allocator s( psFile, nLine );
 	return node_hash_keysA( pnHash );
 }
 
 
-NODE_API node_t * node_hash_keysA( const node_t * pnHash ) 
+node_t * node_hash_keysA( const node_t * pnHash ) 
 {
 	node_t * pnList = NULL;
 	node_t * pn = NULL;
@@ -4509,13 +4506,13 @@ NODE_API node_t * node_hash_keysA( const node_t * pnHash )
 	return pnList;
 }
 
-NODE_API node_t * node_hash_keys_dbgW( const char * psFile, int nLine, const node_t * pnHash ) 
+node_t * node_hash_keys_dbgW( const char * psFile, int nLine, const node_t * pnHash ) 
 {
 	set_debug_allocator s(psFile, nLine);
 	return node_hash_keysW( pnHash );
 }
 
-NODE_API node_t * node_hash_keysW( const node_t * pnHash ) 
+node_t * node_hash_keysW( const node_t * pnHash ) 
 {
 	node_t * pnList = NULL;
 	node_t * pn = NULL;
@@ -4902,17 +4899,17 @@ static wchar_t * NODE_INTERNAL_FUNC AToW( node_arena * pArena, const char * psA,
 	return psW;
 }
 
-NODE_API void node_set_codepage( int nCodePage )
+void node_set_codepage( int nCodePage )
 {
 	node_nCodePage = nCodePage;
 }
 
-NODE_API int node_get_codepage()
+int node_get_codepage()
 {
 	return node_nCodePage;
 }
 
-NODE_API void node_set_debug( int nDebug )
+void node_set_debug( int nDebug )
 {
 	node_nDebug = nDebug;
 
@@ -4922,13 +4919,13 @@ NODE_API void node_set_debug( int nDebug )
 	node_nDebugHashPerf = (node_nDebug & NODE_DEBUG_HASHPERF);
 }
 
-NODE_API int node_get_debug()
+int node_get_debug()
 {
 	return node_nDebug;
 }
 
 
-NODE_API void node_set_error_funcs( node_error_func_t pErrFunc, node_memory_func_t pMemFunc, 
+void node_set_error_funcs( node_error_func_t pErrFunc, node_memory_func_t pMemFunc, 
 								    node_assert_func_t pAssertFunc )
 {
 	node_pfError = pErrFunc;
@@ -5107,7 +5104,7 @@ static int NODE_INTERNAL_FUNC node_string_type( const unsigned char * psValue )
 }
 
 #ifdef USE_DL_MALLOC
-NODE_API node_arena_t node_create_arena( size_t size )
+node_arena_t node_create_arena( size_t size )
 {
 	/* create a new arena and don't select it */
 	
@@ -5122,12 +5119,12 @@ NODE_API node_arena_t node_create_arena( size_t size )
 	return (node_arena_t)pNewArena;
 }
 
-NODE_API node_arena_t node_get_arena()
+node_arena_t node_get_arena()
 {
 	return (node_arena_t)node_pArena;
 }
 
-NODE_API node_arena_t node_set_arena( node_arena_t pNewArena )
+node_arena_t node_set_arena( node_arena_t pNewArena )
 {
 	node_arena * pOld = node_pArena;
 
@@ -5136,7 +5133,7 @@ NODE_API node_arena_t node_set_arena( node_arena_t pNewArena )
 	return (node_arena_t)pOld;
 }
 
-NODE_API size_t node_delete_arena( node_arena_t pToDelete )
+size_t node_delete_arena( node_arena_t pToDelete )
 {
 	node_arena * pArena = (node_arena *)pToDelete;
 	if( pArena == &g_GlobalArena )
@@ -5168,22 +5165,22 @@ NODE_API size_t node_delete_arena( node_arena_t pToDelete )
 	return result;
 }
 #else
-NODE_API node_arena_t node_create_arena( size_t )
+node_arena_t node_create_arena( size_t )
 {
 	return NULL;
 }
 
-NODE_API node_arena_t node_get_arena()
+node_arena_t node_get_arena()
 {
 	return NULL;
 }
 
-NODE_API node_arena_t node_set_arena( node_arena_t  )
+node_arena_t node_set_arena( node_arena_t  )
 {
 	return NULL;
 }
 
-NODE_API size_t node_delete_arena( node_arena_t  )
+size_t node_delete_arena( node_arena_t  )
 {
 	return 0;
 }
@@ -5256,6 +5253,6 @@ public:
 
 static class LibSetup m_l;
 
-NODE_API void node_finalize()
+void node_finalize()
 {
 }
