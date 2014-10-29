@@ -16,3 +16,4 @@ git-version.h
 Visual Lint/
 Debug/
 node.sln.cache
+node_modules

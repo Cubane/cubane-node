@@ -1,0 +1,32 @@
+{
+  "name": "cubane-node",
+  "version": "3.0.0",
+  "description": "A C/C++ library for collections",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:Cubane/cubane-node.git"
+  },
+  "keywords": [
+    "C",
+    "collection",
+    "reverse-engineering",
+    "JSONlike"
+  ],
+  "author": "Cubane Canada Inc.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Cubane/cubane-node/issues"
+  },
+  "homepage": "https://github.com/Cubane/cubane-node",
+  "devDependencies": {
+    "istanbul": "^0.3.2",
+    "mocha": "^2.0.1"
+  }
+}
