@@ -12,7 +12,6 @@ extern "C" {
 
 /* hash a string */
 unsigned int node_hashA( const char * psKey );
-unsigned int node_hashW( const wchar_t * psKey );
 
 #include "node_lookup2.h"
 
@@ -23,7 +22,9 @@ unsigned int node_hashW( const wchar_t * psKey );
 #if !defined(_MSC_VER)
 #define _stricmp strcasecmp
 #define _atoi64  atoll
+#define _vsnprintf_s vsnprintf
 #define TRUE 1
+#define FALSE 0
 
 
 #endif

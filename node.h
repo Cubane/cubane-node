@@ -38,11 +38,7 @@ extern "C" {
 #undef NL_PLATFORM
 #undef NL_RELMODE
 
-#ifdef NODE_USE_CONST
 #define NODE_CONSTOUT const
-#else
-#define NODE_CONSTOUT 
-#endif
 
 /********************
  Node Library Version
@@ -140,11 +136,9 @@ struct __node
 	
 	/* name */
 	char * psAName; 			/* name of this node (may be NULL) */
-	wchar_t * psWName;			/* name of this node (may be NULL) */
+        wchar_t * psWName;
 
 	struct node_arena * pArena;
-	/* Win32 - 16 bytes */
-	/* Win64 - 32 bytes */
 	
 	/* data */
 	unsigned int nType:NODE_TYPE_BITS;		/* type of this node: NODE_xxx */
@@ -160,7 +154,7 @@ struct __node
 		{
 			/* string data */
 			char * psAValue;			/* string value if string type or coerced to string type */
-			wchar_t * psWValue; 		/* string value if string type or coerced to string type */
+                  wchar_t * psWValue;			/* string value if string type or coerced to string type */
 
 			/* numeric data */
 			union
@@ -173,8 +167,6 @@ struct __node
 			int nValue; 				/* int value if int type or coerced */
 			};
 
-			/* Win32 - 16 bytes */
-			/* Win64 - 24 bytes */
 		};
 		
 		struct
@@ -474,7 +466,7 @@ node_t * node_hash_keys_dbgW( const char *psFile, int nLine, const node_t * pnHa
  Error-Handling Functions
  ************************/
 
-typedef void (*node_error_func_t)( char * psError );
+typedef void (*node_error_func_t)( const char * psError );
 typedef int (*node_memory_func_t)( size_t cb );
 typedef void (*node_assert_func_t)( void * psExpr, void * psFile, unsigned int nLine );
 

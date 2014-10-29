@@ -9,6 +9,9 @@
 #include <ctype.h>
 #include <assert.h>
 #include <stddef.h>
+#include <errno.h>
+#include <wchar.h>
+#include <iconv.h>
 
 #define NODE_TRANSPARENT 1
 
@@ -92,9 +95,17 @@ void node_mutex_unlock(node_mutex *nm) {
 }
 
 template <typename T> T __min(T a, T b) { return a<b?a:b; }
+template <typename T> T __max(T a, T b) { return a>b?a:b; }
 
-#define NODE_DFMT64 "%dll"
-#define NODE_XFMT64 "0x%016Xll"
+#define NODE_DFMT64 "%lld"
+#define NODE_XFMT64 "0x%016llX"
+
+int IsTextUnicode( const void * pv, int nLength, int * iFlags) {
+  // TODO: check for BOM, valid UTF-8
+  // TODO: use iconv
+  return 0;
+}
+
 #endif
 
 /* Malloc specials */
@@ -144,7 +155,7 @@ static void inline nfree( node_arena * , void * pv )
 
 #endif
 
-typedef void (*node_assert_func_internal_t)( void * psExpr, const char * psFile, unsigned int nLine );
+typedef void (*node_assert_func_internal_t)( const char * psExpr, const char * psFile, unsigned int nLine );
 
 /**********************
  Module Classes for TLS
@@ -162,21 +173,32 @@ struct node_tls
 	int nSourceLine;
 };
 
-static int m_dwTLSIndex = -1;
+#if defined(_MSC_VER) 
 
-node_tls * GetTLS()
-{
-	if( m_dwTLSIndex < 0 )
+static DWORD m_dwTLSIndex = -1;
+
+void node_tls_alloc() {
+    if( m_dwTLSIndex < 0 )
     {
 		m_dwTLSIndex = TlsAlloc();
     }
+}
+
+void node_tls_free() {
+  TlsFree( m_dwTLSIndex );
+  m_dwTLSIndex = -1;
+}
+
+node_tls * GetTLS()
+{
     node_tls* data = reinterpret_cast<node_tls*>(TlsGetValue(m_dwTLSIndex));
     if(!data)
     {
 		data = new node_tls();
 		if( data == NULL )
 		{
-			OutputDebugStringA( "node library - unable to allocate TLS data structure" );
+                  errno = ENOMEM;
+                  perror("node library - unable to allocate TLS data structure");
 			exit(1);
 		}
 		
@@ -184,6 +206,48 @@ node_tls * GetTLS()
     }
 	return data;
 }
+#else
+static pthread_key_t m_tls_key;
+
+void freetls(void * pv) {
+  node_tls * p = (node_tls *)pv;
+  delete p;
+}
+
+static void node_tls_alloc() {
+  static bool pthread_key_gotten = false;
+
+  if( !pthread_key_gotten )
+    {
+      pthread_key_gotten = true;
+      pthread_key_create( &m_tls_key, freetls );
+    }
+}
+
+static void node_tls_free()
+{
+pthread_key_delete(m_tls_key);
+}
+
+node_tls * GetTLS() {
+node_tls_alloc();
+
+  node_tls* data = reinterpret_cast<node_tls*>(pthread_getspecific(m_tls_key));
+    if(!data)
+    {
+		data = new node_tls();
+		if( data == NULL )
+		{
+                  errno = ENOMEM;
+                  perror("node library - unable to allocate TLS data structure");
+			exit(1);
+		}
+
+                pthread_setspecific(m_tls_key, (void*)data);
+    }
+	return data;
+}
+#endif
 
 static inline int& GetTLS_nCodePage()
 {
@@ -305,22 +369,14 @@ static int node_nDebugHashPerf = 0;
 
 /* spaces - to avoid fputc               1234567890123456 */
 static const char    node_acSpaces[] =  "                ";
-static const wchar_t node_wcSpaces[] = L"                ";
 #define NODE_SPACES_COUNT 16
 
 static const char    node_acHex[] =  "0123456789abcdef";
-static const wchar_t node_wcHex[] = L"0123456789abcdef";
 
 static inline void byte_to_strA( char *& ps, unsigned int b )
 {
 	*ps++ = node_acHex[ (b>>4)&0x0F ];
 	*ps++ = node_acHex[  b    &0x0F ];
-}
-
-static inline void byte_to_strW( wchar_t *& ps, unsigned int b )
-{
-	*ps++ = node_wcHex[ (b>>4)&0x0F ];
-	*ps++ = node_wcHex[  b    &0x0F ];
 }
 
 /***********************
@@ -439,17 +495,14 @@ static void node_hash_add_internal( node_t * pnHash, node_t * pnNew );
 static void node_hash_delete_internal( node_t * pnHash, node_t * pnToDelete );
 
 static node_t * node_hash_getA_internal( const node_t * pnHash, const char * psKey );
-static node_t * node_hash_getW_internal( const node_t * pnHash, const wchar_t * psKey );
 
 static void node_dumpA_internal( const node_t * pn, struct node_dump * pd );
-static void node_dumpW_internal( const node_t * pn, struct node_dump * pd );
 
 static void node_set_nameA_internal( node_t * pn, const char * psName );
 static void node_set_nameW_internal( node_t * pn, const wchar_t * psName );
 
 /* dlmalloc a new string */
 static char * node_safe_copyA( node_arena * pArena, const char * ps );
-static wchar_t * node_safe_copyW( node_arena * pArena, const wchar_t * ps );
 
 /* read a line from a file into malloc'ed storage */
 static char * read_lineA( node_arena * pArena, FILE * pfIn, char ** ppsEnd );
@@ -460,7 +513,6 @@ static char * node_escapeA( node_arena * pArena, const char * psUnescaped );
 static wchar_t * node_escapeW( node_arena * pArena, const wchar_t * psUnescaped );
 
 static char * node_unescapeA( node_arena * pArena, const char * psEscaped, const char * psEnd );
-static wchar_t * node_unescapeW( node_arena * pArena, const wchar_t * psEscaped, const wchar_t * psEnd );
 
 static char * WToA( node_arena * pArena, const wchar_t * psW );
 static char * WToA( node_arena * pArena, const wchar_t * psW, const wchar_t * psWEnd );
@@ -472,7 +524,6 @@ static wchar_t * AToW( node_arena * pArena, const char * psA, size_t nLength );
 
 class NodeReader;
 static int node_parse_internalA(NodeReader *pnr, node_t ** ppn, int nOutputStyle );
-static int node_parse_internalW(NodeReader *pnr, node_t ** ppn, int nOutputStyle );
 
 static int node_parse_internal(FILE *pfIn, node_t ** ppn, int nOutputStyle );
 
@@ -481,10 +532,9 @@ static int node_parse_internal(FILE *pfIn, node_t ** ppn, int nOutputStyle );
 static __inline int printable(int c);
 
 static inline void node_write_spacesA( FILE * pfOut, int nSpaces );
-static inline void node_write_spacesW( FILE * pfOut, int nSpaces );
 
 static int node_memory( size_t cb );
-static void node_error( char * psError, ... );
+static void node_error( const char * psError, ... );
 
 static void _node_assert( const char *, const char *, unsigned int );
 #define node_assert(exp) (void)( (exp) || (_node_assert(#exp, __FILE__, __LINE__), 0) )
@@ -496,16 +546,14 @@ static void hash_rebalance( node_t * pnHash, int nNewBuckets );
 #endif
 
 /* debug checking functions */
-static void node_check_ascii_string( const char * psValue, const char * psContext );
-static void node_check_unicode_string( const wchar_t * psValue, const char * psContext );
 
 #define NODE_STRING_CANTTELL	1
 #define NODE_STRING_ASCII		2
 #define NODE_STRING_UNICODE		3
 
-static int node_string_type( const unsigned char * ps );
-
+#ifdef USE_DL_MALLOC
 static void * node_valloc( node_arena * pArena, size_t nSize );
+#endif
 
 void * node_malloc( struct node_arena * pArena, size_t cb );
 
@@ -526,6 +574,7 @@ public:
 };
 
 class NodeFileReader;
+class NodeWFileReader;
 class NodeStringAReader;
 class NodeStringWReader;
 
@@ -682,12 +731,6 @@ static void node_free_internal( node_t * pn, unsigned int bInCollection )
 			pn->psAName = NULL;
 		}
 		
-		if( pn->psWName != NULL ) 
-		{
-			nfree( pArena, pn->psWName );
-			pn->psWName = NULL;
-		}
-
 		/* free and NULL all members of pn (type specific) */
 		node_cleanup( pn );
 
@@ -984,10 +1027,6 @@ int node_get_int( const node_t *pn)
 		/* convert the string to int and return that */
 		return atoi(pn->psAValue);
 
-	case NODE_STRINGW:
-		/* convert the string to int and return that */
-		return wcstol(pn->psWValue,NULL,10);
-
 	case NODE_LIST:
 		/* if the list has at least one element */
 		if( node_first(pn) != NULL)
@@ -1035,10 +1074,6 @@ int64_t node_get_int64( const node_t *pn)
 	case NODE_STRINGA:
 		/* convert the string to int and return that */
 		return _atoi64(pn->psAValue);
-
-	case NODE_STRINGW:
-		/* convert the string to int and return that */
-		return _wtoi64(pn->psWValue);
 
 	case NODE_LIST:
 		/* if the list has at least one element */
@@ -1088,10 +1123,6 @@ double node_get_real( const node_t *pn )
 		/* convert the string to real and return that */
 		return atof( pn->psAValue );
 
-	case NODE_STRINGW:
-		/* convert the string to real and return that */
-		return wcstod( pn->psWValue, NULL );
-
 	case NODE_LIST:
 		/* if the list has at least one element */
 		if( node_first(pn) != NULL )
@@ -1137,15 +1168,6 @@ NODE_CONSTOUT char * node_get_stringA( node_t *pn )
 	case NODE_STRINGA:
 		return pn->psAValue;
 
-	case NODE_STRINGW:
-		/* convert W to A */
-		if( pn->psAValue == NULL )
-		{
-			pn->psAValue = WToA( pn->pArena, pn->psWValue );
-		}
-
-		return pn->psAValue;
-
 	case NODE_INT:
 		/* free string value if set */
 		if( pn->psAValue != NULL ) 
@@ -1154,7 +1176,7 @@ NODE_CONSTOUT char * node_get_stringA( node_t *pn )
 		}
 
 		/* convert nValue into psValue */
-		sprintf( acBuffer, "%d", pn->nValue, acBuffer );
+		sprintf( acBuffer, "%d", pn->nValue );
 		pn->psAValue = node_safe_copyA( pn->pArena, acBuffer );
 
 		/* return psValue */
@@ -1168,7 +1190,7 @@ NODE_CONSTOUT char * node_get_stringA( node_t *pn )
 		}
 
 		/* convert nValue into psValue */
-		_i64toa( pn->n64Value, acBuffer, 10 );
+		sprintf( acBuffer, NODE_DFMT64, pn->n64Value );
 		pn->psAValue = node_safe_copyA( pn->pArena, acBuffer );
 
 		/* return psValue */
@@ -1219,8 +1241,6 @@ NODE_CONSTOUT wchar_t * node_get_string_dbgW( const char * psFile, int nLine, no
 
 NODE_CONSTOUT wchar_t * node_get_stringW(node_t *pn)
 {
-	wchar_t acBuffer[32] = {0};
-
 	if( pn == NULL )
 	{
 		node_assert( pn != NULL );
@@ -1229,6 +1249,19 @@ NODE_CONSTOUT wchar_t * node_get_stringW(node_t *pn)
 
 	switch (pn->nType) 
 	{
+	case NODE_INT:
+	case NODE_INT64:
+	case NODE_REAL:
+	case NODE_LIST:
+
+          if ( pn->psAValue == NULL ) {
+            nfree( pn->pArena, pn->psAValue );
+          }
+
+          // force implicit conversion to A string
+          node_get_stringA(pn);
+
+          /** fallthrough **/
 	case NODE_STRINGA:
 		if( pn->psWValue == NULL )
 			pn->psWValue = AToW( pn->pArena, pn->psAValue );
@@ -1237,61 +1270,6 @@ NODE_CONSTOUT wchar_t * node_get_stringW(node_t *pn)
 
 	case NODE_STRINGW:
 		return pn->psWValue;
-
-	case NODE_INT:
-		/* free string value if set */
-		if( pn->psWValue != NULL ) 
-		{
-			nfree( pn->pArena, pn->psWValue );
-		}
-
-		/* convert nValue into psValue */
-		_itow( pn->nValue, acBuffer, 10 );
-		pn->psWValue = node_safe_copyW( pn->pArena, acBuffer );
-
-		/* return psValue */
-		return pn->psWValue;
-
-	case NODE_INT64:
-		/* free string value if set */
-		if( pn->psWValue != NULL ) 
-		{
-			nfree( pn->pArena, pn->psWValue );
-		}
-
-		/* convert nValue into psValue */
-		_i64tow( pn->n64Value, acBuffer, 10 );
-		pn->psWValue = node_safe_copyW( pn->pArena, acBuffer );
-
-		/* return psValue */
-		return pn->psWValue;
-
-	case NODE_REAL:
-		/* free string value if set */
-		if( pn->psWValue != NULL ) 
-		{
-			nfree( pn->pArena, pn->psWValue );
-		}
-
-		/* convert nValue into psValue */
-		swprintf( acBuffer, DIMENSION(acBuffer), L"%-16.5f", pn->dfValue );
-		pn->psWValue = node_safe_copyW( pn->pArena, acBuffer );
-
-		/* return psValue */
-		return pn->psWValue;
-
-	case NODE_LIST:
-		/* if has at least one element */
-		if( node_first( pn ) != NULL ) 
-		{
-			/* call node_get_string on first element */
-			return node_get_stringW( node_first( pn ) );
-		}
-		else	/* empty list */
-		{
-			node_assert(pn->pnListHead != NULL);	/* called node_get_stringW on empty list node */
-		}
-		break;
 
 	default:	/* invalid */
 		node_assert(!"Node cannot be converted to string"); /* invalid node type: fail gracefully by returning empty string */
@@ -1776,7 +1754,7 @@ static node_t * node_add_common( node_arena * pArena, int nType, va_list valist 
 
 		break;
 
-	default: /* some scalar type *./
+	default: /* some scalar type */
 		/* create a new node */
 		pnNew = node_alloc_internal( pArena );
 
@@ -1958,26 +1936,14 @@ static node_t * node_hash_addW_valist( node_t * pnHash, const wchar_t * psKey, i
 	/* make sure hash is initialized */
 	node_hash_init( pnHash, DEFAULT_HASHBUCKETS );
 
-	if( node_nDebugUnicode )
-	{
-		/* check that there are no A keys in this hash */
-		if( pnHash->nHashFlags & HASH_CONTAINS_AKEYS )
-		{
-			node_error( "Attempting to add W key to hash which contains A keys.\n" );
-			node_assert( (pnHash->nHashFlags & HASH_CONTAINS_AKEYS) == 0 );
-			return NULL;
-		}
-
-		/* set the W flag */
-		pnHash->nHashFlags |= HASH_CONTAINS_WKEYS;
-	}
-
 	pnNew = node_add_common( pnHash->pArena, nType, valist );
 	if( pnNew == NULL )
 		return NULL;
 
+        char * psAKey = WToA(pnHash->pArena, psKey);
+
 	/* if the item already exists in the hash */
-	pnOld = node_hash_getW_internal( pnHash, psKey );
+	pnOld = node_hash_getA_internal( pnHash, psAKey );
 	if( pnOld != NULL )
 	{
 		/* delete it */
@@ -1988,10 +1954,11 @@ static node_t * node_hash_addW_valist( node_t * pnHash, const wchar_t * psKey, i
 	}
 
 	/* set the node name to psKey */
-	node_set_nameW_internal( pnNew, psKey );
+	node_set_nameA_internal( pnNew, psAKey );
 
 	node_hash_add_internal( pnHash, pnNew );
 
+        nfree(pnHash->pArena, psAKey);
 	return pnNew;
 }
 
@@ -2129,46 +2096,13 @@ node_t * node_hash_getW( const node_t * pnHash, const wchar_t * psKey )
 		return NULL;
 	}
 
-	if( node_nDebugUnicode )
-	{
-		/* check that there are no A keys in this hash */
-		if( pnHash->nHashFlags & HASH_CONTAINS_AKEYS )
-		{
-			node_error( "Attempting to look for a W key in a hash which contains A keys.\n" );
-			node_assert( (pnHash->nHashFlags & HASH_CONTAINS_AKEYS) == 0 );
-		}
-	}
+        char * psAKey = WToA(pnHash->pArena, psKey);
 
-	return node_hash_getW_internal( pnHash, psKey );
-}
+        node_t * pnResult = node_hash_getA_internal(pnHash, psAKey);
 
-static node_t * node_hash_getW_internal( const node_t * pnHash, const wchar_t * psKey )
-{
-	unsigned long nHash;
-	int nBucket;
-	node_t * pnElement = NULL;
+        nfree(pnHash->pArena, psAKey);
 
-	/* hash psKey */
-	nHash = node_hashW( psKey );
-
-	/* get a bucket number */
-	nBucket = hash_to_bucket( pnHash, nHash );
-
-	/* search the bucket for value associated with psKey */
-	pnElement = pnHash->ppnHashHeads[nBucket];
-
-	while( pnElement != NULL)
-	{
-		if( nHash == pnElement->nHash && _wcsicmp( pnElement->psWName, psKey ) == 0 )
-		{
-			/* if found, return a pointer to the found element */
-			return pnElement;
-		}
-		pnElement = node_next( pnElement );
-	}
-
-	/* if not found, return NULL */
-	return NULL;
+	return pnResult;
 }
 
 void node_hash_delete( node_t * pnHash, node_t * pnToDelete )
@@ -2325,30 +2259,11 @@ void node_set_nameW(node_t * pn, const wchar_t * psName)
 		return;
 	}
 
-	node_set_nameW_internal( pn, psName );
+        char * psAName = WToA(pn->pArena, psName);
 
-}
+	node_set_nameA_internal( pn, psAName );
 
-static void node_set_nameW_internal( node_t * pn, const wchar_t * psName )
-{
-	/* if pn->psName is the same as the passed-in name, we're done */
-	if( pn->psWName == psName )
-	{
-		return;
-	}
-
-	/* if pn->psName is set, free it */
-	if( pn->psWName != NULL )
-	{
-		nfree( pn->pArena, pn->psWName );
-	}
-
-	/* copy psName onto pn->psName */
-	pn->psWName = node_safe_copyW( pn->pArena, psName );
-
-	pn->nHash = node_hashW( psName );
-
-	return;
+        nfree(pn->pArena, psAName);
 }
 
 /* get the name of node */
@@ -2363,7 +2278,7 @@ NODE_CONSTOUT char * node_get_nameA( const node_t * pn )
 	return pn->psAName;
 }
 
-NODE_CONSTOUT wchar_t * node_get_nameW( const node_t * pn)
+NODE_CONSTOUT wchar_t * node_get_nameW( node_t * pn)
 {
 	if( pn == NULL )
 	{
@@ -2371,6 +2286,8 @@ NODE_CONSTOUT wchar_t * node_get_nameW( const node_t * pn)
 		return NULL;
 	}
 
+        /* TODO: populate psWName */
+        pn->psWName = AToW(pn->pArena, pn->psAName);
 	return pn->psWName;
 }
 
@@ -2388,7 +2305,7 @@ void node_dumpA( const node_t * pn, FILE * pfOut, int nOptions )
 		return;
 	}
 
-	struct node_dump d = {0};
+	struct node_dump d = {0, 0, 0};
 	d.pfOut = pfOut;
 	d.nOptions = nOptions;
 	d.nSpaces = 0;
@@ -2416,17 +2333,7 @@ static void node_dumpA_internal( const node_t * pn, struct node_dump * pd )
 	node_write_spacesA( pfOut, nSpaces );
 
 	/* write the name (if any) */
-	if( pn->psWName != NULL && pn->psAName == NULL )
-	{
-		char *psA = WToA( pArena, pn->psWName );
-		psEscaped = node_escapeA( pArena, psA );
-		nfree( pArena, psA );
-
-		fputs( psEscaped, pfOut );
-		nfree( pArena, psEscaped );
-		psEscaped = NULL;
-	}
-	else if( pn->psAName != NULL )
+        if( pn->psAName != NULL )
 	{
 		psEscaped = node_escapeA( pArena, pn->psAName );
 		fputs( psEscaped, pfOut );
@@ -2519,13 +2426,13 @@ static void node_dumpA_internal( const node_t * pn, struct node_dump * pd )
 			size_t l;
 			data_t * pb;
 			
-			size_t nChunk = __min( 16, nLength );
+			size_t nChunk = __min( 16ul, nLength );
 
 			/* a dollar for every row... */
 			*ps++ = '$';
 
 			pb = pbBase;
-			size_t nSmallChunk = __min( 8, nChunk );
+			size_t nSmallChunk = __min( 8ul, nChunk );
 			switch( nSmallChunk )
 			{
 			case  8: *ps++ = ' '; byte_to_strA( ps, *pb++ );
@@ -2678,280 +2585,18 @@ void node_dumpW( const node_t * pn, FILE * pfOut, int nOptions )
 		return;
 	}
 
-	struct node_dump d = {0};
+	struct node_dump d = {0,0,0};
 	d.pfOut = pfOut;
 	d.nOptions = nOptions;
 	d.nSpaces = 0;
 
-	node_dumpW_internal( pn, &d );
+        // TODO:
+        //node_dumpA_to_string()
+        // AtoW
+        // fwrite( pfOut, psW, sizeof(wchar), wcslen(psW)+1 )
+        // nfree
 
 	fflush( pfOut );
-}
-
-
-static void node_dumpW_internal( const node_t * pn, struct node_dump * pd )
-{
-	int i;
-	node_t * pnElt;
-	float fTemp;
-	wchar_t * psEscaped = NULL;
-
-	data_t * pbBase;
-	int nLength;
-
-	FILE * pfOut = pd->pfOut;
-	int nSpaces = pd->nSpaces;
-	int nOptions = pd->nOptions;
-	node_arena * pArena = pn->pArena;
-
-	/* write node_nSpaces spaces */
-	node_write_spacesW( pfOut, nSpaces );
-
-	/* write the name (if any) */
-	if( pn->psAName != NULL && pn->psWName == NULL )
-	{
-		wchar_t * psW = AToW( pArena, pn->psAName );
-		psEscaped = node_escapeW( pArena, psW );
-		nfree( pArena, psW );
-
-		fputws( psEscaped, pfOut );
-		nfree( pArena, psEscaped );
-		psEscaped = NULL;
-
-	}
-	else if( pn->psWName != NULL)
-	{
-		psEscaped = node_escapeW( pArena, pn->psWName );
-		fputws( psEscaped, pfOut );
-		nfree( pArena,  psEscaped );
-		psEscaped = NULL;
-	}
-
-	/* write ':' */
-	fputws( L": ", pfOut );
-	
-	switch( pn->nType )
-	{
-	case NODE_INT:
-		fwprintf( pfOut, L"%d  (0x%08X)\r\n", pn->nValue, pn->nValue );
-		break;
-
-	case NODE_INT64:
-		fwprintf( pfOut, L"%I64dL  (0x%016I64X)\r\n", pn->n64Value, pn->n64Value );
-		break;
-
-	case NODE_REAL:
-		fTemp = (float)pn->dfValue;
-		fwprintf( pfOut, L"%f  (0x%08X)\r\n", pn->dfValue, *((int*)&fTemp) );
-		break;
-
-	case NODE_STRINGA:
-		{
-			wchar_t * psW = NULL;
-
-			if( pn->psWValue == NULL )
-				psW = AToW( pArena, pn->psAValue );
-			else
-				psW = pn->psWValue;
-
-			if( nOptions & DO_NOESCAPE )
-			{
-				fwprintf( pfOut, L"\"%s\"\r\n", psW );
-			}
-			else
-			{
-				psEscaped = node_escapeW( pArena, psW );
-				fwprintf( pfOut, L"'%s'\r\n", psEscaped );
-				nfree( pArena, psEscaped );
-			}
-
-			if( pn->psWValue == NULL )
-				nfree( pArena, psW );
-		}
-		break;
-
-	case NODE_STRINGW:
-		if( nOptions & DO_NOESCAPE )
-		{
-			fwprintf( pfOut, L"\"%s\"\r\n", pn->psWValue );
-		}
-		else
-		{
-			psEscaped = node_escapeW( pArena, pn->psWValue );
-			fwprintf( pfOut, L"'%s'\r\n", psEscaped );
-			nfree( pArena, psEscaped );
-		}
-		break;
-
-	case NODE_PTR:
-		/* dump out the pointer value */
-		fwprintf( pfOut, L"PTR 0x%p\r\n", pn->pvValue );
-		break;
-
-	case NODE_DATA:
-		/* DATA: write 'DATA ', the data length, and a newline, 
-		   then write a hex dump of the data like this:
-		   $ 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00 ................ */
-		fwprintf(pfOut, L"DATA %d\r\n", pn->nDataLength );
-		
-		pbBase = pn->pbValue;
-		nLength = pn->nDataLength;
-		
-		/* 16 bytes per line AND remainder */
-		while( nLength > 0 )
-		{
-			wchar_t acBuffer[80];
-			wchar_t * ps = acBuffer;
-			int l, i;
-			data_t * pb;
-			
-			int nChunk = __min( 16, nLength );
-
-			/* a dollar for every row... */
-			*ps++ = '$';
-
-			pb = pbBase;
-			int nSmallChunk = __min( 8, nChunk );
-			switch( nSmallChunk )
-			{
-			case  8: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  7: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  6: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  5: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  4: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  3: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  2: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  1: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			}
-			l = 3 * (8-nSmallChunk) + 1;
-			for( i = 0; i <l; i++ )
-				*ps++ = L' ';
-
-			nSmallChunk = nChunk - nSmallChunk;
-			switch( nSmallChunk )
-			{
-			case  8: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  7: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  6: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  5: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  4: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  3: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  2: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			case  1: *ps++ = ' '; byte_to_strW( ps, *pb++ );
-			}
-
-			/* add the spaces */
-			l = 3 * (8-nSmallChunk);
-			for( i = 0; i <l; i++ )
-				*ps++ = L' ';
-
-			/* add some spaces between the hex and character info */
-			*ps++ = ' '; *ps++ = ' '; *ps++ = ' ';
-
-			/* now output the character values for the row */
-			pb = pbBase;
-			switch( nChunk )
-			{
-			case 16: *ps++ = (wchar_t)printable(*pb++);
-			case 15: *ps++ = (wchar_t)printable(*pb++);
-			case 14: *ps++ = (wchar_t)printable(*pb++);
-			case 13: *ps++ = (wchar_t)printable(*pb++);
-			case 12: *ps++ = (wchar_t)printable(*pb++);
-			case 11: *ps++ = (wchar_t)printable(*pb++);
-			case 10: *ps++ = (wchar_t)printable(*pb++);
-			case  9: *ps++ = (wchar_t)printable(*pb++);
-			case  8: *ps++ = (wchar_t)printable(*pb++);
-			case  7: *ps++ = (wchar_t)printable(*pb++);
-			case  6: *ps++ = (wchar_t)printable(*pb++);
-			case  5: *ps++ = (wchar_t)printable(*pb++);
-			case  4: *ps++ = (wchar_t)printable(*pb++);
-			case  3: *ps++ = (wchar_t)printable(*pb++);
-			case  2: *ps++ = (wchar_t)printable(*pb++);
-			case  1: *ps++ = (wchar_t)printable(*pb++);
-			}
-
-			l = 16-nChunk;
-			for( i = 0; i <l; i++ )
-				*ps++ = L' ';
-			
-			*ps++ = '\r'; 
-			*ps++ ='\n';
-			fwrite( acBuffer, ps-acBuffer, sizeof(*ps), pfOut );
-
-			nLength -= nChunk;
-			pbBase += nChunk;
-		}
-
-		break;
-
-	case NODE_LIST:
-
-		fputws( L"(\r\n", pfOut );
-
-		/* increase the indentation */
-		pd->nSpaces += 2;
-
-		/* for each element in the list, call node_dump */
-		for(pnElt = node_first(pn); pnElt != NULL; pnElt = node_next(pnElt))
-		{
-			node_dumpW_internal( pnElt, pd );
-		}
-
-		/* restore the previous level of indentation */
-		pd->nSpaces -= 2;
-
-		node_write_spacesW( pfOut, nSpaces );
-
-		fputws( L")\r\n", pfOut );
-		break;
-
-	case NODE_HASH:
-
-		/* HASH: write '{' and newline */
-		fputws( L"{\r\n", pfOut );
-
-		/* increase the indentation */
-		pd->nSpaces += 2;
-		
-		/* for each element in the hash, call node_dump */
-		if(pn->ppnHashHeads != NULL)
-		{
-			/* loop for 1..nHashBuckets */
-			for(i=0; i < pn->nHashBuckets; i++)
-			{
-				for(pnElt = pn->ppnHashHeads[i];pnElt != NULL; pnElt = node_next(pnElt) )
-				{
-					/* call node_dump on each element of ppnHashHeads */
-					node_dumpW_internal( pnElt, pd );
-				}
-
-			}
-		} /* if pn->ppnHashHeads != NULL */
-
-		/* restore the previous level of indentation */
-		pd->nSpaces -= 2;
-
-		node_write_spacesW( pfOut, nSpaces );
-
-		fputws( L"}\r\n", pfOut );
-		break;
-
-	/* everything else */
-	default:
-		node_assert(!"Node type unknown in node_dump");	/* tried to dump node of unknown or invalid type */
-	}
-	
-	return;
-}
-
-static inline void node_write_spacesW( FILE * pfOut, int nSpaces )
-{
-	int nChunk = 0;
-	for( int n = nSpaces; n > 0; n -= nChunk )
-	{
-		nChunk = __min( n, 16 );
-		fwrite( node_wcSpaces, nChunk, sizeof(wchar_t), pfOut );
-	}
 }
 
 
@@ -2978,6 +2623,30 @@ public:
 		wchar_t * psLine = ::read_lineW( m_pArena, m_pfIn, &psEnd ); 
 		*psStart = psLine; 
 		*ppsEnd = psEnd; 
+	}
+	void free_line( const void * psLine ) { nfree( m_pArena, (void*)psLine ); }
+};
+
+/* get A lines from a file */
+class NodeWFileReader : public NodeReader
+{
+	FILE * m_pfIn;
+public:
+	NodeWFileReader( FILE * pfIn, node_arena * pArena ) : NodeReader(pArena), m_pfIn(pfIn)  {}
+	void read_lineA( const char ** psStart, const char ** ppsEnd ) 
+	{ 
+		wchar_t * psWE;
+		wchar_t * psWS = ::read_lineW( m_pArena, m_pfIn, &psWE ); 
+
+		char * psLine = WToA( m_pArena, psWS, psWE ); 
+		*psStart = psLine;
+		*ppsEnd = (psLine+strlen(psLine));
+
+                nfree(m_pArena, psWS);
+	}
+	void read_lineW( const wchar_t ** psStart, const wchar_t ** ppsEnd ) 
+	{ 
+          node_assert(!"NodeWFileReader::readLineW should not be called!");
 	}
 	void free_line( const void * psLine ) { nfree( m_pArena, (void*)psLine ); }
 };
@@ -3019,7 +2688,7 @@ public:
 	void read_lineW( const wchar_t ** ppsStart, const wchar_t ** ppsEnd ) { node_assert(!"NodeStringAReader::read_lineW() is not defined."); *ppsStart = *ppsEnd = NULL; }
 
 	/* free_line is a no-op because the line was not independently allocated */
-	void free_line( const void * psLine ) { psLine = psLine; }
+	void free_line( const void * ) {  }
 };
 
 /* get W lines from a W string */
@@ -3038,7 +2707,13 @@ public:
 	}
 	~NodeStringWReader() {  }
 
-	void read_lineW( const wchar_t ** ppsStart, const wchar_t ** ppsEnd ) 
+  void read_lineW( const wchar_t ** ppsStart, const wchar_t ** ppsEnd ) {
+    node_assert(!"NodeStringAReader::read_lineW() is not public.");
+    *ppsStart = *ppsEnd = NULL;
+  }
+          
+private:
+	void read_lineW_internal( const wchar_t ** ppsStart, const wchar_t ** ppsEnd ) 
 	{ 
 		const wchar_t * psStart = NULL;
 		const wchar_t * psEnd = NULL;
@@ -3057,10 +2732,24 @@ public:
 		*ppsStart = psStart;
 		*ppsEnd = psEnd;
 	}
-	void read_lineA( const char **, const char ** ) { node_assert(!"NodeStringWReader:read_lineA() is not defined."); }
+public:
+  
+	void read_lineA( const char ** ppsStart, const char ** ppsEnd) {
+
+          const wchar_t * psWS;
+          const wchar_t * psWE;
+          read_lineW_internal( &psWS, &psWE );
+
+          char * psA = WToA(m_pArena, psWS, psWE );
+
+          *ppsStart = psA;
+          *ppsEnd = psA + strlen(psA);
+        }
 
 	/* free_line is a no-op because the line was not independently allocated */
-	void free_line( const void * psLine ) { psLine = psLine; }
+	void free_line( const void * psLine ) {
+          nfree(m_pArena, (void*)psLine);
+        }
 };
 
 
@@ -3091,7 +2780,7 @@ int node_parseW( FILE * pfIn, node_t ** ppn )
 	if( pfIn == NULL || ppn == NULL )
 		return NP_INVALID;
 
-	return node_parse_internal( pfIn, ppn, NODE_W );
+	return node_parse_internal( pfIn, ppn, NODE_A );
 }
 
 int node_parse_dbgW( const char * psFile, int nLine, FILE * pfIn, node_t ** ppn )
@@ -3101,7 +2790,7 @@ int node_parse_dbgW( const char * psFile, int nLine, FILE * pfIn, node_t ** ppn 
 	if( pfIn == NULL || ppn == NULL )
 		return NP_INVALID;
 
-	return node_parse_internal( pfIn, ppn, NODE_W );
+	return node_parse_internal( pfIn, ppn, NODE_A );
 }
 
 int node_parse_from_stringA( const char * ps, node_t ** ppn )
@@ -3130,7 +2819,7 @@ int node_parse_from_stringW( const wchar_t * ps, node_t ** ppn )
 		return NP_INVALID;
 
 	NodeStringWReader nr( node_pArena, ps );
-	return node_parse_internalW( &nr, ppn, NODE_W );
+	return node_parse_internalA( &nr, ppn, NODE_A );
 }
 
 int node_parse_from_string_dbgW( const char * psFile, int nLine, const wchar_t * ps, node_t ** ppn )
@@ -3141,7 +2830,7 @@ int node_parse_from_string_dbgW( const char * psFile, int nLine, const wchar_t *
 		return NP_INVALID;
 
 	NodeStringWReader nr( node_pArena, ps);
-	return node_parse_internalW( &nr, ppn, NODE_W );
+	return node_parse_internalA( &nr, ppn, NODE_A );
 }
 
 static int node_parse_from_data_internal( const void * pv, size_t nBytes, node_t ** ppn, int nType )
@@ -3156,12 +2845,12 @@ static int node_parse_from_data_internal( const void * pv, size_t nBytes, node_t
 	if( bUnicode )
 	{
 		NodeStringWReader nr( node_pArena, (wchar_t *)pv, nBytes/2 );
-		return node_parse_internalW( &nr, ppn, nType );
+		return node_parse_internalA( &nr, ppn, NODE_A );
 	}
 	else
 	{
 		NodeStringAReader nr( node_pArena, (char *)pv, nBytes );
-		return node_parse_internalA( &nr, ppn, nType );
+		return node_parse_internalA( &nr, ppn, NODE_A );
 	}
 }
 
@@ -3188,7 +2877,7 @@ int node_parse_from_dataW( const void * pv, size_t nBytes, node_t ** ppn )
 	if( pv == NULL || ppn == NULL )
 		return NP_INVALID;
 
-	return node_parse_from_data_internal( pv, nBytes, ppn, NODE_W );
+	return node_parse_from_data_internal( pv, nBytes, ppn, NODE_A );
 }
 
 int node_parse_from_data_dbgW( const char * psFile, int nLine, const void * pv, size_t nBytes, node_t ** ppn )
@@ -3198,7 +2887,7 @@ int node_parse_from_data_dbgW( const char * psFile, int nLine, const void * pv, 
 	if( pv == NULL || ppn == NULL )
 		return NP_INVALID;
 
-	return node_parse_from_data_internal( pv, nBytes, ppn, NODE_W );
+	return node_parse_from_data_internal( pv, nBytes, ppn, NODE_A );
 }
 
 static int node_parse_internal( FILE * pfIn, node_t ** ppn, int nOutputStyle )
@@ -3218,13 +2907,14 @@ static int node_parse_internal( FILE * pfIn, node_t ** ppn, int nOutputStyle )
 	/* restore the file position */
 	fsetpos( pfIn, &fpt );
 
-	NodeFileReader nr( pfIn, node_pArena );
-
 	/* if the file is Unicode */
-	if( nResult > 0 )
-		return node_parse_internalW( &nr, ppn, nOutputStyle );
-	else
-		return node_parse_internalA( &nr, ppn, nOutputStyle );
+	if( nResult > 0 ) {
+          NodeWFileReader nr( pfIn, node_pArena );
+          return node_parse_internalA( &nr, ppn, NODE_A );
+        } else {
+          NodeFileReader nr( pfIn, node_pArena );
+          return node_parse_internalA( &nr, ppn, NODE_A );
+        }
 }
 
 template <class T> static const T * unterminated_strchr( const T * psStart, const T * psEnd, const int nChar )
@@ -3390,18 +3080,7 @@ READ_LINE:
 	pn = node_alloc_internal( pArena );
 	if( psName != NULL )
 	{
-		if( nOutputStyle == NODE_A )
-		{
-			node_set_nameA_internal( pn, psName );
-		}
-		else
-		{
-			wchar_t * psW = AToW( pArena, psName );
-			node_set_nameW_internal( pn, psW );
-			nfree( pArena, psW );
-		}
-
-		nfree( pArena, psName );
+          node_set_nameA_internal( pn, psName );
 	}
 
 	/* switch the node type */
@@ -3521,26 +3200,13 @@ READ_LINE:
 			node_t * pnList = node_list_alloc();
 			while( (nResult = node_parse_internalA( pnr, &pnChild, nOutputStyle ) ) == NP_NODE )
 			{
-				if( nOutputStyle == NODE_A )
-				{
-					if( pnChild->psAName != NULL )
-						node_push_internal( pnList, pnChild );
-					else
-					{
-						node_free( pnChild );
-						node_error( "Child of hash has no name -- skipping.\n" );
-					}
-				}
-				else
-				{
-					if( pnChild->psWName != NULL )
-						node_push_internal( pnList, pnChild );
-					else
-					{
-						node_free( pnChild );
-						node_error( "Child of hash has no name -- skipping.\n" );
-					}
-				}
+                          if( pnChild->psAName != NULL )
+                            node_push_internal( pnList, pnChild );
+                          else
+                            {
+                              node_free( pnChild );
+                              node_error( "Child of hash has no name -- skipping.\n" );
+                            }
 			}
 
 			if( nResult != NP_CBRACE )
@@ -3572,279 +3238,6 @@ PARSE_ERROR:
 	
 	return NP_SERROR;
 }
-
-static int node_parse_internalW( NodeReader *pnr, node_t ** ppn, int nOutputStyle )
-{
-	const wchar_t * psLine = NULL;
-	const wchar_t * psEnd = NULL;
-	const wchar_t * psPos = NULL;
-
-	const wchar_t * psColon = NULL;
-	wchar_t * psName = NULL;
-	wchar_t * psUnescaped = NULL;
-
-	node_t * pn = NULL;
-	node_t * pnChild = NULL;
-	const wchar_t * psType = NULL;
-
-	const wchar_t * psTrailingQuote = NULL;
-
-	int nDataLength = 0;
-	data_t * pb = NULL;
-	int nRows = 0;
-	int i = 0;
-	const wchar_t * psData = NULL;
-	const wchar_t * psCursor = NULL;
-	int b = 0;
-
-	node_arena * pArena = pnr->m_pArena;
-
-	int nResult = 0;
-
-	/* initialize the returned node */
-	*ppn = NULL;
-
-	/* read a line */
-READ_LINE:
-	pnr->read_lineW( &psLine, &psEnd );
-
-	/* if it fails */
-	if( psLine == NULL )
-		return NP_EOF;
-
-	/* skip initial white-space */
-	for( psPos = psLine; psPos < psEnd; ++psPos )
-		if( !iswspace( *psPos ) )
-			break;
-
-	/* what kind of line is this? */
-
-	/* if it's blank -- read another line */
-	if( psPos >= psEnd )
-	{
-		pnr->free_line( psLine );
-		goto READ_LINE;
-	}
-
-	/* if it's a close paren */
-	if( *psPos == ')' )
-	{
-		pnr->free_line( psLine );
-		return NP_CPAREN;
-	}
-
-	/* if it's a close brace */
-	if( *psPos == '}' )
-	{
-		pnr->free_line( psLine );
-		return NP_CBRACE;
-	}
-
-	/* it's a normal node */
-
-	/* unescape the name */
-	psColon = unterminated_strchr<wchar_t>( psPos, psEnd, ':' );
-	if( psColon == NULL )
-		goto PARSE_ERROR;
-
-	if( psColon != psPos )
-	{
-		psName = node_unescapeW( pArena, psPos, psColon );
-	}
-
-	/* figure out the node type */
-	for( psType = psColon+1; psType < psEnd; psType++ )
-		if( !iswspace( *psType ) )
-			break;
-
-	/* allocate a new node */
-	pn = node_alloc_internal( pArena );
-	if( psName != NULL )
-	{
-		if( nOutputStyle == NODE_W )
-		{
-			node_set_nameW_internal( pn, psName );
-		}
-		else
-		{
-			/* TODO: warn possible loss of data */
-			char * psA = WToA( pArena, psName );
-			node_set_nameA_internal( pn, psA );
-			nfree( pArena, psA );
-		}
-
-		nfree( pArena, psName );
-	}
-
-	/* switch the node type */
-	switch( *psType )
-	{
-		/* TODO: possibly worry about localized numbers output */
-	case '.': case '0': case '1': case '2': case '3': case '4':
-	case '-': case '5': case '6': case '7': case '8': case '9':
-		{
-			TempSZ<wchar_t> psValue( pArena, psType, psEnd );
-
-			if( wcschr( psValue, '.' ) != NULL )
-				node_set_real( pn, wcstod( psValue, NULL ) );
-			else if( wcschr( psValue, 'L' ) != NULL )
-				node_set_int64( pn, _wtoi64( psValue ) );
-			else
-				node_set_int( pn, wcstol( psValue, NULL, 10 ) );
-		}
-		break;
-
-	case '"':
-		/* remove trailing quote */
-		psTrailingQuote = unterminated_strrchr<wchar_t>( psType, psEnd, '"' );
-		if( psTrailingQuote == NULL || psTrailingQuote <= psType )
-		{
-			node_error( "Unterminated string.\n" );
-			goto PARSE_ERROR;
-		}
-
-		if( nOutputStyle == NODE_W )
-			node_set_stringW_internal( pn, psType+1, psTrailingQuote );
-		else
-		{
-			char * psA = WToA( pArena, psType+1, psTrailingQuote );
-			node_set_stringA_internal( pn, psA );
-			nfree( pArena, psA );
-		}
-
-		break;
-
-	case '\'':
-		/* remove trailing quote */
-		psTrailingQuote = unterminated_strrchr<wchar_t>( psType, psEnd, '\'' );
-		if( psTrailingQuote == NULL || psTrailingQuote <= psType )
-		{
-			node_error( "Unterminated string.\n" );
-			goto PARSE_ERROR;
-		}
-
-		psUnescaped = node_unescapeW( pArena, psType+1, psTrailingQuote );
-
-		if( nOutputStyle == NODE_W )
-			node_set_stringW_internal( pn, psUnescaped );
-		else
-		{
-			char * psA = WToA( pArena, psUnescaped );
-			node_set_stringA_internal( pn, psA );
-			nfree( pArena, psA );
-		}
-
-		nfree( pArena, psUnescaped );
-		break;
-	
-	case 'D':
-		nDataLength = wcstol( psType + 4, NULL, 10 );
-		pb = (data_t *)node_malloc( pArena, nDataLength );
-		/* loop over the rows of the binary data */
-		for( nRows = 0; nRows < (nDataLength+15)/16; nRows++ )
-		{
-			const wchar_t * psDataEnd;
-
-			/* read a new line */
-			pnr->read_lineW( &psData, &psDataEnd );
-			psCursor = psData+1;
-
-			for( i = nRows*16; i < nDataLength && i < (nRows+1)*16; i++ )
-			{
-				/* skip whitespace */
-				psCursor += wcsspn( psCursor, L" " );
-
-				/* convert the hex data to a byte */
-				b = wcstoul( psCursor, NULL, 16 );
-				psCursor += 2;
-
-				/* set the data */
-				pb[i] = (data_t)b;
-			}
-			pnr->free_line( psData );
-		}
-
-		node_set_data( pn, nDataLength, pb );
-		nfree( pArena, pb );
-		break;
-
-	case 'P':
-		/* handle reading in pointer value: use NULL */
-		node_set_ptr( pn, NULL );
-		break;
-
-	case '(':
-		node_list_init( pn );
-		while( (nResult = node_parse_internalW( pnr, &pnChild, nOutputStyle ) ) == NP_NODE )
-		{
-			node_list_add_internal( pn, pnChild );
-		}
-
-		if( nResult != NP_CPAREN )
-		{
-			node_error( "No close paren for list.\n" );
-			goto PARSE_ERROR;
-		}
-
-		break;
-	case '{':
-		{
-			node_t * pnList = node_list_alloc();
-
-			while( (nResult = node_parse_internalW( pnr, &pnChild, nOutputStyle ) ) == NP_NODE )
-			{
-				if( nOutputStyle == NODE_A )
-				{
-					if( pnChild->psAName != NULL )
-						node_push_internal( pnList, pnChild );
-					else
-					{
-						node_free( pnChild );
-						node_error( "Child of hash has no name -- skipping.\n" );
-					}
-				}
-				else
-				{
-					if( pnChild->psWName != NULL )
-						node_push_internal( pnList, pnChild );
-					else
-					{
-						node_free( pnChild );
-						node_error( "Child of hash has no name -- skipping.\n" );
-					}
-				}
-			}
-
-			if( nResult != NP_CBRACE )
-			{
-				node_error( "No close brace for hash.\n" );
-				node_free( pnList );
-				goto PARSE_ERROR;
-			}
-
-			node_hash_init( pn, __max( DEFAULT_HASHBUCKETS, pnList->nListElements>>3 )  );
-
-			while( pnList->nListElements != 0 )
-				node_hash_add_internal( pn, node_pop_internal( pnList ) );
-
-			node_free( pnList );
-	
-		}
-		break;
-	}
-
-	pnr->free_line( psLine );
-	*ppn = pn;
-	return NP_NODE;
-
-PARSE_ERROR:
-	if( pn != NULL )
-		node_free_internal( pn, NOT_IN_COLLECTION );
-	pnr->free_line( psLine );
-	
-	return NP_SERROR;
-}
-
 
 /*****************
  Utility Functions
@@ -3899,8 +3292,6 @@ static node_t * node_copy_internal( node_arena * pArena, const node_t * pnSource
 	/* copy the name */
 	if( pnSource->psAName != NULL )
 		pnCopy->psAName = node_safe_copyA( pArena, pnSource->psAName );
-	if( pnSource->psWName != NULL )
-		pnCopy->psWName = node_safe_copyW( pArena, pnSource->psWName );
 
 	/* if there's a pnNext, ignore it */
 	pnCopy->pnNext = NULL;
@@ -3998,24 +3389,6 @@ static char * node_safe_copyA( struct node_arena * pArena, const char * ps )
 	return psCopy;
 }
 
-/* safely copy W string */
-static wchar_t * node_safe_copyW( struct node_arena * pArena, const wchar_t * ps )
-{
-	wchar_t * psCopy;
-
-	size_t length;
-
-	length = (wcslen(ps) + 1) * sizeof(wchar_t);
-
-	/* allocate memory */
-	psCopy = (wchar_t *)node_malloc( pArena, length );
-
-	/* copy the string */
-	wcscpy( psCopy, ps );
-
-	return psCopy;
-}
-
 /* takes a byte and returns '.' if unprintable; else returns the byte */
 static __inline int printable(int c)
 {
@@ -4074,11 +3447,6 @@ static void node_set_stringA( node_t * pn, const char * psAValue )
 	/* clean up */
 	node_cleanup( pn );
 
-	if( node_nDebugUnicode )
-	{
-		node_check_ascii_string( psAValue, "NODE_STRINGA" );
-	}
-
 	node_set_stringA_internal( pn, psAValue );
 }
 
@@ -4133,22 +3501,12 @@ static void node_set_stringW( node_t * pn, const wchar_t * psWValue )
 	/* clean up */
 	node_cleanup( pn );
 
-	if( node_nDebugUnicode )
-	{
-		node_check_unicode_string( psWValue, "NODE_STRINGW" );
-	}
-	
 	node_set_stringW_internal( pn, psWValue );
 }
 
 static void node_set_stringW_internal( node_t * pn, const wchar_t * psWValue )
 {
 	node_set_stringW_internal( pn, psWValue, wcslen( psWValue ) );
-}
-
-static void node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, const wchar_t * psEnd )
-{
-	node_set_stringW_internal( pn, psWValue, psEnd-psWValue );
 }
 
 static void node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, size_t cch )
@@ -4592,7 +3950,7 @@ node_t * node_hash_keysW( const node_t * pnHash )
 		{
 			node_t * pnName = node_alloc_internal( pnList->pArena );
 
-			node_set_stringW_internal( pnName, pn->psWName );
+			node_set_stringA_internal( pnName, pn->psAName );
 
 			node_list_add_internal( pnList, pnName );
 		}
@@ -4785,40 +4143,6 @@ static char * node_escapeA( struct node_arena * pArena, const char * psUnescaped
 	return psEscaped;
 }
 
-static wchar_t * node_escapeW( struct node_arena * pArena, const wchar_t * psUnescaped )
-{
-	wchar_t * psEscaped = NULL;
-	wchar_t * psE = NULL;
-	const wchar_t * psU = NULL;
-
-	const size_t nEscapedLen = (3*wcslen(psUnescaped) + 1);
-	psEscaped = (wchar_t *)node_malloc( pArena, nEscapedLen*sizeof(wchar_t) );
-
-	psE = psEscaped;
-	psU = psUnescaped;
-	while( *psU != '\0' )
-	{
-		if( ( psU == psUnescaped && ( *psU == '}' || *psU == ')' || *psU == '$' ) ) ||
-			*psU == '%' || *psU == ':' || *psU == '\r' || *psU == '\n' )
-		{
-			/* write out a percent */
-			*psE++ = '%';
-
-			/* write out the hex code */
-			swprintf( psE, nEscapedLen-(psE - psEscaped), L"%02X", *psU );
-			psU++;
-			psE += 2;
-		}
-		else
-		{
-			*psE++ = *psU++;
-		}
-	}
-	*psE = '\0';
-
-	return psEscaped;
-}
-
 static char * node_unescapeA( struct node_arena * pArena, const char * psEscaped, const char * psEnd )
 {
 	char * psUnescaped = (char *)node_malloc( pArena, psEnd-psEscaped+1 );
@@ -4852,38 +4176,6 @@ static char * node_unescapeA( struct node_arena * pArena, const char * psEscaped
 	return psUnescaped;
 }
 
-static wchar_t * node_unescapeW( struct node_arena * pArena, const wchar_t * psEscaped, const wchar_t * psEnd )
-{
-	wchar_t * psUnescaped = (wchar_t *)node_malloc( pArena, (psEnd-psEscaped+1)*sizeof(wchar_t) );
-	const wchar_t * psE = psEscaped;
-	wchar_t * psU = psUnescaped;
-
-	int n = 0;
-
-	while( psE < psEnd )
-	{
-		switch( *psE )
-		{
-		case '%':
-			{
-				/* step over the percent */
-				psE++;
-
-				/* convert the hex code */
-				TempSZ<wchar_t> t( pArena, psE, psE+2 );
-				n = wcstoul( t, NULL, 16 );
-				*psU++ = (wchar_t)n;
-				psE += 2;
-			}
-			break;
-		default:
-			*psU++ = *psE++;
-		}
-	}
-	*psU = '\0';
-
-	return psUnescaped;
-}
 
 static char * WToA( node_arena * pArena, const wchar_t * psW )
 {
@@ -4893,6 +4185,32 @@ static char * WToA( node_arena * pArena, const wchar_t * psW )
 static char * WToA( node_arena * pArena, const wchar_t * psW, const wchar_t * psWEnd )
 {
 	return WToA( pArena, psW, psWEnd - psW );
+}
+
+static wchar_t * AToW( node_arena * pArena, const char * psA )
+{
+	return AToW( pArena, psA, strlen(psA) );
+}
+
+static wchar_t * AToW( node_arena * pArena, const char * psA, const char * psAEnd )
+{
+	return AToW( pArena, psA, psAEnd-psA );
+}
+
+#if defined(_MSC_VER)
+static wchar_t * AToW( node_arena * pArena, const char * psA, size_t nLength )
+{
+	wchar_t * psW = NULL;
+
+	int nCodePage = node_nCodePage;
+	DWORD dwLength = MultiByteToWideChar( nCodePage, 0, psA, (int)nLength, NULL, 0 ) + 1;
+
+	psW = (wchar_t *)node_malloc( pArena, dwLength * sizeof(wchar_t) );
+
+	MultiByteToWideChar( nCodePage, 0, psA, (int)nLength, psW, dwLength );
+	psW[dwLength-1] = '\0';
+
+	return psW;
 }
 
 static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
@@ -4909,31 +4227,58 @@ static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
 
 	return psA;
 }
-
-static wchar_t * AToW( node_arena * pArena, const char * psA )
-{
-	return AToW( pArena, psA, strlen(psA) );
-}
-
-static wchar_t * AToW( node_arena * pArena, const char * psA, const char * psAEnd )
-{
-	return AToW( pArena, psA, psAEnd-psA );
-}
-
+#else
 static wchar_t * AToW( node_arena * pArena, const char * psA, size_t nLength )
 {
 	wchar_t * psW = NULL;
+        char * psWc = NULL;
+	wchar_t * psWStart = NULL;
+        size_t nOut;
 
-	int nCodePage = node_nCodePage;
-	DWORD dwLength = MultiByteToWideChar( nCodePage, 0, psA, (int)nLength, NULL, 0 ) + 1;
+        iconv_t cd = iconv_open("UTF-8", "UTF-16");
 
-	psW = (wchar_t *)node_malloc( pArena, dwLength * sizeof(wchar_t) );
+        nOut = nLength+2;
+        psW = (wchar_t *)node_malloc(pArena, sizeof(wchar_t)*nOut);
+        psWc = (char *)psW;
+        psWStart = psW;
 
-	MultiByteToWideChar( nCodePage, 0, psA, (int)nLength, psW, dwLength );
-	psW[dwLength-1] = '\0';
+        size_t nResult = iconv(cd, (char**)&psA, &nLength, &psWc, &nOut);
+        if (nResult == (size_t)(-1)) {
+          node_error("AToW conversion error");
+        }
+        psW = (wchar_t *)psWc;
+        *psW = (wchar_t)0;
 
-	return psW;
+        return psWStart;
 }
+
+static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
+{
+  char * psA = NULL;
+  char * psAStart = NULL;
+        size_t nOut;
+
+        iconv_t cd = iconv_open("UTF-16", "UTF-8");
+
+        nOut = 6*cch+2;
+        psA = (char *)node_malloc(pArena, sizeof(char)*nOut);
+        psAStart = psA;
+
+        size_t nResult = iconv(cd, (char**)&psW, &cch, &psA, &nOut);
+        if (nResult == (size_t)(-1)) {
+          node_error("WToA conversion error");
+        }
+        *psA = (wchar_t)0;
+
+        char * psCopy = (char *)node_malloc(pArena, 1+(psA-psAStart) );
+        strlcpy(psCopy, psAStart, 1+(psA-psAStart));
+        nfree(pArena, psAStart);
+
+        return psCopy;
+}
+
+#endif
+
 
 void node_set_codepage( int nCodePage )
 {
@@ -4974,13 +4319,13 @@ static void _node_assert( const char * psExpr, const char * psFile, unsigned int
 	if( node_pfAssert != NULL )
 	{
 		if( node_source_file != NULL )
-			node_pfAssert( psExpr, node_source_file, node_source_line );
+                  node_pfAssert( psExpr, node_source_file, node_source_line );
 		else
-			node_pfAssert( psExpr, psFile, nLine );
+                  node_pfAssert( psExpr, psFile, nLine );
 	}
 }
 
-static void node_error( char * psError, ... )
+static void node_error( const char * psError, ... )
 {
 	char acBuffer[1024] = {0};
 	va_list ap;
@@ -5087,58 +4432,6 @@ void freelist_cleanup()
 }
 
 
-/*******************
- Debugging Functions
- *******************/
-static void node_check_ascii_string( const char * psValue, const char * psContext )
-{
-	int nType = node_string_type( (const unsigned char *)psValue );
-
-	if( nType == NODE_STRING_UNICODE )
-	{
-		node_error( "Allegedly ascii value %s appears Unicode (%S) in context %s.\n", 
-			psValue, (wchar_t *)psValue, psContext );
-	}
-}
-
-static void node_check_unicode_string( const wchar_t * psValue, const char * psContext )
-{
-	int nType = node_string_type( (const unsigned char *)psValue );
-
-	if( nType == NODE_STRING_ASCII )
-	{
-		node_error( "Allegedly Unicode value %S appears ascii (%s) in context %s.\n", 
-			psValue, (char *)psValue, psContext );
-	}
-}
-
-static int node_string_type( const unsigned char * psValue )
-{
-	size_t cb = strlen( (char *)psValue );
-	if( cb == 1 )
-	{
-		/* check for Unicode-looking text */
-		if( psValue[1] == 0 && psValue[3] == 0 && psValue[5] == 0 && 
-			isprint( psValue[2] ) && isprint( psValue[4] ) && isprint( psValue[6] ) )
-		{
-			cb = 2*wcslen( (wchar_t *)psValue );
-		}
-	}
-
-	if( cb < 6 )
-		return NODE_STRING_CANTTELL;
-
-	/* guard against running off end of page */
-	cb = __min( cb, 64 );
-
-	int iFlags = 0xFFDD;
-	if( IsTextUnicode( psValue, (int)cb, &iFlags ) )
-		return NODE_STRING_UNICODE;
-	else
-		return NODE_STRING_ASCII;
-
-}
-
 #ifdef USE_DL_MALLOC
 node_arena_t node_create_arena( size_t size )
 {
@@ -5223,38 +4516,6 @@ size_t node_delete_arena( node_arena_t  )
 #endif
 
 
-#ifdef NODE_DLL
-static void TLSThreadCleanup()
-{
-	node_tls * ptls = GetTLS();
-	if( ptls != NULL )
-		delete ptls;
-}
-
-BOOL WINAPI DllMain( HINSTANCE /*hInstance*/, DWORD fdwReason, LPVOID /*lpvReserved*/ )
-{
-	switch( fdwReason )
-	{
-	case DLL_PROCESS_ATTACH:
-		if( m_dwTLSIndex < 0 )
-			return FALSE;
-		break;
-
-	case DLL_THREAD_ATTACH:
-		break;
-
-	case DLL_THREAD_DETACH:
-		TLSThreadCleanup();
-		break;
-
-	case DLL_PROCESS_DETACH:
-		TLSThreadCleanup();
-		break;
-	}
-
-	return TRUE;
-}
-#endif /* NODE_DLL */
 
 class LibSetup
 {
@@ -5272,7 +4533,7 @@ public:
 #endif
 //		_CrtSetBreakAlloc( 1380 );
 
-		m_dwTLSIndex = TlsAlloc();
+		node_tls_alloc();
 	}
 
 	~LibSetup()
@@ -5282,8 +4543,7 @@ public:
 		memset( &(g_GlobalArena.csFreeList), 0, sizeof(g_GlobalArena.csFreeList) );
 #endif
 
-		TlsFree( m_dwTLSIndex );
-		m_dwTLSIndex = -1;
+                node_tls_free();
 	}
 };
 
