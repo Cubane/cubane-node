@@ -197,7 +197,7 @@ ub4 hash2( register ub1 * k, register ub4 length, register ub4 initval )
 */
 #pragma warning( disable:4305 )
 
-ub4 NODE_INTERNAL_FUNC hash3( const register ub1 * k, register ub4 length, register ub4 initval )
+ub4 hash3( const register ub1 * k, register ub4 length, register ub4 initval )
 {
    register ub4 a,b,c,len;
 

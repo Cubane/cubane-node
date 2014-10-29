@@ -68,7 +68,7 @@ static __inline int __cdecl wcscmp_inl(
 	return( ret );
 }
 
-static void NODE_INTERNAL_FUNC dict_insert_internal( dict_t * dict, dnode_t * parent, dnode_t * node, int result );
+static void dict_insert_internal( dict_t * dict, dnode_t * parent, dnode_t * node, int result );
 
 /*
 * Perform a ``left rotation'' adjustment on the tree.	The given node P and
@@ -77,7 +77,7 @@ static void NODE_INTERNAL_FUNC dict_insert_internal( dict_t * dict, dnode_t * pa
 * for P.  The ordering of the keys within the tree is thus preserved.
 */
 
-static void NODE_INTERNAL_FUNC rotate_left(dnode_t *upper)
+static void rotate_left(dnode_t *upper)
 {
 	dnode_t *lower, *lowleft, *upparent;
 	
@@ -105,7 +105,7 @@ static void NODE_INTERNAL_FUNC rotate_left(dnode_t *upper)
 * the same procedure, but with left and right interchanged.
 */
 
-static void NODE_INTERNAL_FUNC rotate_right(dnode_t *upper)
+static void rotate_right(dnode_t *upper)
 {
 	dnode_t *lower, *lowright, *upparent;
 	
@@ -130,7 +130,7 @@ static void NODE_INTERNAL_FUNC rotate_right(dnode_t *upper)
 * node and free everything under it.  Used by dict_free().
 */
 
-static void NODE_INTERNAL_FUNC free_nodes(dnode_t *node, dnode_t *nil)
+static void free_nodes(dnode_t *node, dnode_t *nil)
 {
 	dnode_t * l, * r;
 	if (node == nil)
@@ -149,7 +149,7 @@ static void NODE_INTERNAL_FUNC free_nodes(dnode_t *node, dnode_t *nil)
 * Dynamically allocate and initialize a dictionary object.
 */
 
-dict_t * NODE_INTERNAL_FUNC dict_create()
+dict_t * dict_create()
 {
 	dict_t *new = node_malloc(sizeof *new);
 	
@@ -168,7 +168,7 @@ dict_t * NODE_INTERNAL_FUNC dict_create()
 * installed free routine. The dictionary is emptied.
 */
 
-void NODE_INTERNAL_FUNC dict_free_nodes(dict_t *dict)
+void dict_free_nodes(dict_t *dict)
 {
 	dnode_t *nil = dict_nil(dict), *root = dict_root(dict);
 	free_nodes(root, nil);
@@ -176,7 +176,7 @@ void NODE_INTERNAL_FUNC dict_free_nodes(dict_t *dict)
 	dict->nilnode.right = &dict->nilnode;
 }
 
-dnode_t * NODE_INTERNAL_FUNC dict_lookupA(dict_t *dict, const char *key)
+dnode_t * dict_lookupA(dict_t *dict, const char *key)
 {
 	dnode_t *root;
 	dnode_t *nil;
@@ -205,7 +205,7 @@ dnode_t * NODE_INTERNAL_FUNC dict_lookupA(dict_t *dict, const char *key)
 }
 
 
-dnode_t * NODE_INTERNAL_FUNC dict_ensure_existsA(dict_t *dict, const char *key )
+dnode_t * dict_ensure_existsA(dict_t *dict, const char *key )
 {
 	dnode_t *root;
 	dnode_t *parent;
@@ -251,7 +251,7 @@ dnode_t * NODE_INTERNAL_FUNC dict_ensure_existsA(dict_t *dict, const char *key )
 	return root;
 }
 
-dnode_t * NODE_INTERNAL_FUNC dict_lookupW(dict_t *dict, const wchar_t *key)
+dnode_t * dict_lookupW(dict_t *dict, const wchar_t *key)
 {
 	dnode_t *root;
 	dnode_t *nil;
@@ -279,7 +279,7 @@ dnode_t * NODE_INTERNAL_FUNC dict_lookupW(dict_t *dict, const wchar_t *key)
 	return NULL;
 }
 
-dnode_t * NODE_INTERNAL_FUNC dict_ensure_existsW(dict_t *dict, const wchar_t *key )
+dnode_t * dict_ensure_existsW(dict_t *dict, const wchar_t *key )
 {
 	dnode_t *root;
 	dnode_t *parent;
@@ -330,7 +330,7 @@ dnode_t * NODE_INTERNAL_FUNC dict_ensure_existsW(dict_t *dict, const wchar_t *ke
 * Insert a node into the dictionary. The node should have been
 * initialized with a data field. All other fields are ignored.
 */
-static void NODE_INTERNAL_FUNC dict_insert_internal( dict_t * dict, dnode_t * parent, dnode_t * node, int result )
+static void dict_insert_internal( dict_t * dict, dnode_t * parent, dnode_t * node, int result )
 {
 	dnode_t * nil = dict_nil(dict);
 	dnode_t *uncle, *grandpa;
@@ -412,7 +412,7 @@ static void NODE_INTERNAL_FUNC dict_insert_internal( dict_t * dict, dnode_t * pa
 * deleted node is returned.
 */
 
-dnode_t * NODE_INTERNAL_FUNC dict_delete(dict_t *dict, dnode_t *delete)
+dnode_t * dict_delete(dict_t *dict, dnode_t *delete)
 {
 	dnode_t *nil = dict_nil(dict), *child, *delparent = delete->parent;
 	
@@ -559,7 +559,7 @@ dnode_t * NODE_INTERNAL_FUNC dict_delete(dict_t *dict, dnode_t *delete)
 * (that is, dict_isempty(dict) returns 1) a null pointer is returned.
 */
 
-dnode_t * NODE_INTERNAL_FUNC dict_first(dict_t *dict)
+dnode_t * dict_first(dict_t *dict)
 {
 	dnode_t *nil = dict_nil(dict), *root = dict_root(dict), *left;
 	
@@ -577,7 +577,7 @@ dnode_t * NODE_INTERNAL_FUNC dict_first(dict_t *dict)
 * the nil node.
 */
 
-dnode_t * NODE_INTERNAL_FUNC dict_next(dict_t *dict, dnode_t *curr)
+dnode_t * dict_next(dict_t *dict, dnode_t *curr)
 {
 	dnode_t *nil = dict_nil(dict), *parent, *left;
 	

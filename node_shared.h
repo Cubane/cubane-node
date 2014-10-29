@@ -10,18 +10,9 @@ extern "C" {
  What Internal calling convention are we using?
  **********************************************/
 
-/* pass some args in registers */
-#define WITH_FASTCALL 1
-
-#ifdef WITH_FASTCALL
-#define	NODE_INTERNAL_FUNC	__fastcall
-#else
-#define NODE_INTERNAL_FUNC
-#endif
-
 /* hash a string */
-unsigned int NODE_INTERNAL_FUNC node_hashA( const char * psKey );
-unsigned int NODE_INTERNAL_FUNC node_hashW( const wchar_t * psKey );
+unsigned int node_hashA( const char * psKey );
+unsigned int node_hashW( const wchar_t * psKey );
 
 #include "node_lookup2.h"
  

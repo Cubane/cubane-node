@@ -354,125 +354,125 @@ struct node_dump
 
 /* set the node to a value using variable arguments. nType determines how 
 arguments are processed.*/
-static void NODE_INTERNAL_FUNC node_set_valist(node_t *pn, int nType, va_list valist);
-static node_t * NODE_INTERNAL_FUNC node_add_common( node_arena * pArena, int nType, va_list valist );
+static void node_set_valist(node_t *pn, int nType, va_list valist);
+static node_t * node_add_common( node_arena * pArena, int nType, va_list valist );
 
-static void NODE_INTERNAL_FUNC node_set_int( node_t * pn, int nValue );
-static void NODE_INTERNAL_FUNC node_set_int64( node_t * pn, int64_t nValue );
-static void NODE_INTERNAL_FUNC node_set_real( node_t * pn, double dfValue );
-static void NODE_INTERNAL_FUNC node_set_stringA( node_t * pn, const char * psAValue );
-static void NODE_INTERNAL_FUNC node_set_stringW( node_t * pn, const wchar_t * psWValue );
-static void NODE_INTERNAL_FUNC node_set_ptr( node_t * pn, void * pv );
+static void node_set_int( node_t * pn, int nValue );
+static void node_set_int64( node_t * pn, int64_t nValue );
+static void node_set_real( node_t * pn, double dfValue );
+static void node_set_stringA( node_t * pn, const char * psAValue );
+static void node_set_stringW( node_t * pn, const wchar_t * psWValue );
+static void node_set_ptr( node_t * pn, void * pv );
 
 /* versions with less arg checking */
-static void NODE_INTERNAL_FUNC node_set_stringA_internal( node_t * pn, const char * psAValue );
-static void NODE_INTERNAL_FUNC node_set_stringA_internal( node_t * pn, const char * psAValue, const char * psEnd );
-static void NODE_INTERNAL_FUNC node_set_stringA_internal( node_t * pn, const char * psAValue, size_t nLength );
+static void node_set_stringA_internal( node_t * pn, const char * psAValue );
+static void node_set_stringA_internal( node_t * pn, const char * psAValue, const char * psEnd );
+static void node_set_stringA_internal( node_t * pn, const char * psAValue, size_t nLength );
 
-static void NODE_INTERNAL_FUNC node_set_stringW_internal( node_t * pn, const wchar_t * psWValue );
-static void NODE_INTERNAL_FUNC node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, const wchar_t * psEnd );
-static void NODE_INTERNAL_FUNC node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, size_t cch );
+static void node_set_stringW_internal( node_t * pn, const wchar_t * psWValue );
+static void node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, const wchar_t * psEnd );
+static void node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, size_t cch );
 
-static void NODE_INTERNAL_FUNC node_set_data_internal( node_t * pn, int nLength, const data_t * pb );
+static void node_set_data_internal( node_t * pn, int nLength, const data_t * pb );
 
 /* initialize a list node */
-static void NODE_INTERNAL_FUNC node_list_init(node_t * pn);	
+static void node_list_init(node_t * pn);	
 
 /* initialize a hash node */
-static void NODE_INTERNAL_FUNC node_hash_init( node_t * pn, int nHashBuckets );
+static void node_hash_init( node_t * pn, int nHashBuckets );
 
 /* clean up overlaid structures in a node changing type */
-static void NODE_INTERNAL_FUNC node_cleanup( node_t * pn );
+static void node_cleanup( node_t * pn );
 
 /* internal analogs of external functions */
-static node_t * NODE_INTERNAL_FUNC node_alloc_internal( node_arena * pArena );
-static void NODE_INTERNAL_FUNC node_free_internal( node_t * pn, unsigned int bInCollection );
+static node_t * node_alloc_internal( node_arena * pArena );
+static void node_free_internal( node_t * pn, unsigned int bInCollection );
 
-static node_t * NODE_INTERNAL_FUNC node_list_add_valist( node_t * pnList, int nType, va_list valist );
-static void NODE_INTERNAL_FUNC node_list_add_internal( node_t * pnList, node_t * pnNew );
-static void NODE_INTERNAL_FUNC node_list_delete_internal( node_t * pnList, node_t * pnToDelete );
+static node_t * node_list_add_valist( node_t * pnList, int nType, va_list valist );
+static void node_list_add_internal( node_t * pnList, node_t * pnNew );
+static void node_list_delete_internal( node_t * pnList, node_t * pnToDelete );
 
-static node_t * NODE_INTERNAL_FUNC node_push_valist( node_t * pnList, int nType, va_list valist );
-static node_t * NODE_INTERNAL_FUNC node_push_internal( node_t * pnList, node_t * pnNew );
-static node_t * NODE_INTERNAL_FUNC node_pop_internal( node_t * pnList );
+static node_t * node_push_valist( node_t * pnList, int nType, va_list valist );
+static node_t * node_push_internal( node_t * pnList, node_t * pnNew );
+static node_t * node_pop_internal( node_t * pnList );
 
-static node_t * NODE_INTERNAL_FUNC node_copy_internal( node_arena * pArena, const node_t * pnSource );
+static node_t * node_copy_internal( node_arena * pArena, const node_t * pnSource );
 
-static node_t * NODE_INTERNAL_FUNC node_hash_addA_valist( node_t * pnHash, const char * psKey, int nType, va_list valist );
-static node_t * NODE_INTERNAL_FUNC node_hash_addW_valist( node_t * pnHash, const wchar_t * psKey, int nType, va_list valist );
-static void NODE_INTERNAL_FUNC node_hash_add_internal( node_t * pnHash, node_t * pnNew );
-static void NODE_INTERNAL_FUNC node_hash_delete_internal( node_t * pnHash, node_t * pnToDelete );
+static node_t * node_hash_addA_valist( node_t * pnHash, const char * psKey, int nType, va_list valist );
+static node_t * node_hash_addW_valist( node_t * pnHash, const wchar_t * psKey, int nType, va_list valist );
+static void node_hash_add_internal( node_t * pnHash, node_t * pnNew );
+static void node_hash_delete_internal( node_t * pnHash, node_t * pnToDelete );
 
-static node_t * NODE_INTERNAL_FUNC node_hash_getA_internal( const node_t * pnHash, const char * psKey );
-static node_t * NODE_INTERNAL_FUNC node_hash_getW_internal( const node_t * pnHash, const wchar_t * psKey );
+static node_t * node_hash_getA_internal( const node_t * pnHash, const char * psKey );
+static node_t * node_hash_getW_internal( const node_t * pnHash, const wchar_t * psKey );
 
-static void NODE_INTERNAL_FUNC node_dumpA_internal( const node_t * pn, struct node_dump * pd );
-static void NODE_INTERNAL_FUNC node_dumpW_internal( const node_t * pn, struct node_dump * pd );
+static void node_dumpA_internal( const node_t * pn, struct node_dump * pd );
+static void node_dumpW_internal( const node_t * pn, struct node_dump * pd );
 
-static void NODE_INTERNAL_FUNC node_set_nameA_internal( node_t * pn, const char * psName );
-static void NODE_INTERNAL_FUNC node_set_nameW_internal( node_t * pn, const wchar_t * psName );
+static void node_set_nameA_internal( node_t * pn, const char * psName );
+static void node_set_nameW_internal( node_t * pn, const wchar_t * psName );
 
 /* dlmalloc a new string */
-static char * NODE_INTERNAL_FUNC node_safe_copyA( node_arena * pArena, const char * ps );
-static wchar_t * NODE_INTERNAL_FUNC node_safe_copyW( node_arena * pArena, const wchar_t * ps );
+static char * node_safe_copyA( node_arena * pArena, const char * ps );
+static wchar_t * node_safe_copyW( node_arena * pArena, const wchar_t * ps );
 
 /* read a line from a file into malloc'ed storage */
-static char * NODE_INTERNAL_FUNC read_lineA( node_arena * pArena, FILE * pfIn, char ** ppsEnd );
-static wchar_t * NODE_INTERNAL_FUNC read_lineW( node_arena * pArena, FILE * pfIn, wchar_t ** ppsEnd );
+static char * read_lineA( node_arena * pArena, FILE * pfIn, char ** ppsEnd );
+static wchar_t * read_lineW( node_arena * pArena, FILE * pfIn, wchar_t ** ppsEnd );
 
 /* escape and unescape pesky characters */
-static char * NODE_INTERNAL_FUNC node_escapeA( node_arena * pArena, const char * psUnescaped );
-static wchar_t * NODE_INTERNAL_FUNC node_escapeW( node_arena * pArena, const wchar_t * psUnescaped );
+static char * node_escapeA( node_arena * pArena, const char * psUnescaped );
+static wchar_t * node_escapeW( node_arena * pArena, const wchar_t * psUnescaped );
 
-static char * NODE_INTERNAL_FUNC node_unescapeA( node_arena * pArena, const char * psEscaped, const char * psEnd );
-static wchar_t * NODE_INTERNAL_FUNC node_unescapeW( node_arena * pArena, const wchar_t * psEscaped, const wchar_t * psEnd );
+static char * node_unescapeA( node_arena * pArena, const char * psEscaped, const char * psEnd );
+static wchar_t * node_unescapeW( node_arena * pArena, const wchar_t * psEscaped, const wchar_t * psEnd );
 
-static char * NODE_INTERNAL_FUNC WToA( node_arena * pArena, const wchar_t * psW );
-static char * NODE_INTERNAL_FUNC WToA( node_arena * pArena, const wchar_t * psW, const wchar_t * psWEnd );
-static char * NODE_INTERNAL_FUNC WToA( node_arena * pArena, const wchar_t * psW, size_t cch );
+static char * WToA( node_arena * pArena, const wchar_t * psW );
+static char * WToA( node_arena * pArena, const wchar_t * psW, const wchar_t * psWEnd );
+static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch );
 
-static wchar_t * NODE_INTERNAL_FUNC AToW( node_arena * pArena, const char * psA );
-static wchar_t * NODE_INTERNAL_FUNC AToW( node_arena * pArena, const char * psA, const char * psAEnd );
-static wchar_t * NODE_INTERNAL_FUNC AToW( node_arena * pArena, const char * psA, size_t nLength );
+static wchar_t * AToW( node_arena * pArena, const char * psA );
+static wchar_t * AToW( node_arena * pArena, const char * psA, const char * psAEnd );
+static wchar_t * AToW( node_arena * pArena, const char * psA, size_t nLength );
 
 class NodeReader;
-static int NODE_INTERNAL_FUNC node_parse_internalA(NodeReader *pnr, node_t ** ppn, int nOutputStyle );
-static int NODE_INTERNAL_FUNC node_parse_internalW(NodeReader *pnr, node_t ** ppn, int nOutputStyle );
+static int node_parse_internalA(NodeReader *pnr, node_t ** ppn, int nOutputStyle );
+static int node_parse_internalW(NodeReader *pnr, node_t ** ppn, int nOutputStyle );
 
-static int NODE_INTERNAL_FUNC node_parse_internal(FILE *pfIn, node_t ** ppn, int nOutputStyle );
+static int node_parse_internal(FILE *pfIn, node_t ** ppn, int nOutputStyle );
 
 /* takes a byte and returns '.' if unprintable; else returns itself */
 /* takes an int because the ctype function isprint() takes an int */
 static __inline int printable(int c);
 
-static inline void NODE_INTERNAL_FUNC node_write_spacesA( FILE * pfOut, int nSpaces );
-static inline void NODE_INTERNAL_FUNC node_write_spacesW( FILE * pfOut, int nSpaces );
+static inline void node_write_spacesA( FILE * pfOut, int nSpaces );
+static inline void node_write_spacesW( FILE * pfOut, int nSpaces );
 
-static int NODE_INTERNAL_FUNC node_memory( size_t cb );
-static void NODE_INTERNAL_FUNC node_error( char * psError, ... );
+static int node_memory( size_t cb );
+static void node_error( char * psError, ... );
 
 #define node_assert(exp) (void)( (exp) || (_node_assert(#exp, __FILE__, __LINE__), 0) )
-static void NODE_INTERNAL_FUNC _node_assert( void *, const char *, unsigned int );
+static void _node_assert( void *, const char *, unsigned int );
 
 static int __inline hash_to_bucket( const node_t * pnHash, int nHash );
 
 #ifdef HASH_AUTO_RESIZE
-static void NODE_INTERNAL_FUNC hash_rebalance( node_t * pnHash, int nNewBuckets );
+static void hash_rebalance( node_t * pnHash, int nNewBuckets );
 #endif
 
 /* debug checking functions */
-static void NODE_INTERNAL_FUNC node_check_ascii_string( const char * psValue, const char * psContext );
-static void NODE_INTERNAL_FUNC node_check_unicode_string( const wchar_t * psValue, const char * psContext );
+static void node_check_ascii_string( const char * psValue, const char * psContext );
+static void node_check_unicode_string( const wchar_t * psValue, const char * psContext );
 
 #define NODE_STRING_CANTTELL	1
 #define NODE_STRING_ASCII		2
 #define NODE_STRING_UNICODE		3
 
-static int NODE_INTERNAL_FUNC node_string_type( const unsigned char * ps );
+static int node_string_type( const unsigned char * ps );
 
-static void * NODE_INTERNAL_FUNC node_valloc( node_arena * pArena, size_t nSize );
+static void * node_valloc( node_arena * pArena, size_t nSize );
 
-void * NODE_INTERNAL_FUNC node_malloc( struct node_arena * pArena, size_t cb );
+void * node_malloc( struct node_arena * pArena, size_t cb );
 
 /***********************************************
  Node Parsing Classes - Interface & Declarations 
@@ -559,7 +559,7 @@ node_t * node_alloc_dbg( const char * psFile, int nLine )
 	return node_alloc_internal( node_pArena );
 }
 
-static node_t * NODE_INTERNAL_FUNC node_alloc_internal( node_arena * pArena )
+static node_t * node_alloc_internal( node_arena * pArena )
 {
 	node_t * pnNew = NULL;
 
@@ -626,7 +626,7 @@ void node_free(node_t *pn)
 	node_free_internal( pn, NOT_IN_COLLECTION );
 }
 
-static void NODE_INTERNAL_FUNC node_free_internal( node_t * pn, unsigned int bInCollection )
+static void node_free_internal( node_t * pn, unsigned int bInCollection )
 {
 	node_t * pnSaved = NULL;
 
@@ -678,7 +678,7 @@ static void NODE_INTERNAL_FUNC node_free_internal( node_t * pn, unsigned int bIn
  * and leaves list nodes untouched.
  * 
  */
-static void NODE_INTERNAL_FUNC node_list_init(node_t * pn)
+static void node_list_init(node_t * pn)
 {
 	/* if it's a list already */
 	if( pn->nType == NODE_LIST ) 
@@ -705,7 +705,7 @@ static void NODE_INTERNAL_FUNC node_list_init(node_t * pn)
 }
 
 /* initialize a hash node */
-static void NODE_INTERNAL_FUNC node_hash_init( node_t * pn, int nHashBuckets )
+static void node_hash_init( node_t * pn, int nHashBuckets )
 {
 	/* if it's a hash, do nothing */
 	if(pn->nType == NODE_HASH)
@@ -818,7 +818,7 @@ node_t * node_hash_alloc2( int nHashBuckets )
 }
 
 #ifdef _DEBUG
-static void NODE_INTERNAL_FUNC node_hash_store_debug( node_t * pn, const char * psFile, int nLine )
+static void node_hash_store_debug( node_t * pn, const char * psFile, int nLine )
 {
 	char acFile[1024];
 	_snprintf( acFile, sizeof(acFile), "%s(%d) :", psFile, nLine );
@@ -1423,7 +1423,7 @@ node_t * node_list_add(node_t * pnList, int nType, ...)
 	return pnNew;
 }
 
-static node_t * NODE_INTERNAL_FUNC node_list_add_valist( node_t * pnList, int nType, va_list valist )
+static node_t * node_list_add_valist( node_t * pnList, int nType, va_list valist )
 {
 	if( pnList == NULL )
 	{
@@ -1443,7 +1443,7 @@ static node_t * NODE_INTERNAL_FUNC node_list_add_valist( node_t * pnList, int nT
 	return pnNew;
 }
 
-static void NODE_INTERNAL_FUNC node_list_add_internal( node_t * pnList, node_t * pnNew )
+static void node_list_add_internal( node_t * pnList, node_t * pnNew )
 {
 	node_assert( pnNew->bInCollection == NOT_IN_COLLECTION );
 
@@ -1490,7 +1490,7 @@ void node_list_delete( node_t * pnList, node_t * pnToDelete )
 	node_list_delete_internal( pnList, pnToDelete );
 }
 
-static void NODE_INTERNAL_FUNC node_list_delete_internal( node_t * pnList, node_t * pnToDelete )
+static void node_list_delete_internal( node_t * pnList, node_t * pnToDelete )
 {
 	node_t * pnPrevious = NULL;
 	node_t * pnScroll = NULL;
@@ -1584,7 +1584,7 @@ node_t * node_push( node_t * pnList, int nType, ... )
 	return pnNew;
 }
 
-static node_t * NODE_INTERNAL_FUNC node_push_valist( node_t * pnList, int nType, va_list valist )
+static node_t * node_push_valist( node_t * pnList, int nType, va_list valist )
 {
 	node_t * pnNew = NULL;
 
@@ -1604,7 +1604,7 @@ static node_t * NODE_INTERNAL_FUNC node_push_valist( node_t * pnList, int nType,
 	return node_push_internal( pnList, pnNew );
 }
 
-node_t * NODE_INTERNAL_FUNC node_push_internal( node_t * pnList, node_t * pnNew )
+node_t * node_push_internal( node_t * pnList, node_t * pnNew )
 {
 	/* this node is now in a collection */
 	node_assert( pnNew->bInCollection == NOT_IN_COLLECTION );
@@ -1646,7 +1646,7 @@ node_t * node_pop( node_t * pnList )
 	return node_pop_internal( pnList );
 }
 
-node_t * NODE_INTERNAL_FUNC node_pop_internal( node_t * pnList )
+node_t * node_pop_internal( node_t * pnList )
 {
 	node_t * pnPopped = NULL;
 
@@ -1673,7 +1673,7 @@ node_t * NODE_INTERNAL_FUNC node_pop_internal( node_t * pnList )
  Hash Functions
  **************/
 
-static node_t * NODE_INTERNAL_FUNC node_add_common( node_arena * pArena, int nType, va_list valist )
+static node_t * node_add_common( node_arena * pArena, int nType, va_list valist )
 {
 	node_t * pnElement = NULL;
 	node_t * pnNew = NULL;
@@ -1787,7 +1787,7 @@ node_t * node_hash_addA(node_t * pnHash, const char * psKey, int nType, ...)
 	return pn;
 }
 
-static node_t * NODE_INTERNAL_FUNC node_hash_addA_valist(node_t * pnHash, const char * psKey, int nType, va_list valist )
+static node_t * node_hash_addA_valist(node_t * pnHash, const char * psKey, int nType, va_list valist )
 {
 	node_t * pnNew = NULL;
 
@@ -1840,7 +1840,7 @@ static node_t * NODE_INTERNAL_FUNC node_hash_addA_valist(node_t * pnHash, const 
 	return pnNew;
 }
 
-static void NODE_INTERNAL_FUNC node_hash_add_internal( node_t * pnHash, node_t * pnNew )
+static void node_hash_add_internal( node_t * pnHash, node_t * pnNew )
 {
 	int nBucket;
 
@@ -1907,7 +1907,7 @@ node_t * node_hash_addW( node_t * pnHash, const wchar_t * psKey, int nType, ... 
 	return pnNew;
 }
 
-static node_t * NODE_INTERNAL_FUNC node_hash_addW_valist( node_t * pnHash, const wchar_t * psKey, int nType, va_list valist )
+static node_t * node_hash_addW_valist( node_t * pnHash, const wchar_t * psKey, int nType, va_list valist )
 {
 	node_t * pnNew = NULL;
 
@@ -1961,7 +1961,7 @@ static node_t * NODE_INTERNAL_FUNC node_hash_addW_valist( node_t * pnHash, const
 }
 
 #ifdef HASH_AUTO_RESIZE
-static void NODE_INTERNAL_FUNC hash_rebalance( node_t * pnHash )
+static void hash_rebalance( node_t * pnHash )
 {
 	int nOldBuckets = pnHash->nHashBuckets;
 	int nNewBuckets = 0;
@@ -2048,7 +2048,7 @@ node_t * node_hash_getA( const node_t * pnHash, const char * psKey)
 	return node_hash_getA_internal( pnHash, psKey );
 }
 
-static node_t * NODE_INTERNAL_FUNC node_hash_getA_internal( const node_t * pnHash, const char * psKey )
+static node_t * node_hash_getA_internal( const node_t * pnHash, const char * psKey )
 {
 	unsigned long nHash;
 	int nBucket;
@@ -2107,7 +2107,7 @@ node_t * node_hash_getW( const node_t * pnHash, const wchar_t * psKey )
 	return node_hash_getW_internal( pnHash, psKey );
 }
 
-static node_t * NODE_INTERNAL_FUNC node_hash_getW_internal( const node_t * pnHash, const wchar_t * psKey )
+static node_t * node_hash_getW_internal( const node_t * pnHash, const wchar_t * psKey )
 {
 	unsigned long nHash;
 	int nBucket;
@@ -2154,7 +2154,7 @@ void node_hash_delete( node_t * pnHash, node_t * pnToDelete )
 	node_hash_delete_internal( pnHash, pnToDelete );
 }
 
-static void NODE_INTERNAL_FUNC node_hash_delete_internal( node_t * pnHash, node_t * pnToDelete )
+static void node_hash_delete_internal( node_t * pnHash, node_t * pnToDelete )
 {
 	node_t * pnPrevious = NULL;
 	node_t * pnScroll = NULL;
@@ -2244,7 +2244,7 @@ void node_set_nameA(node_t * pn, const char * psName)
 	node_set_nameA_internal( pn, psName );
 }
 
-static void NODE_INTERNAL_FUNC node_set_nameA_internal( node_t * pn, const char * psName )
+static void node_set_nameA_internal( node_t * pn, const char * psName )
 {
 	/* if pn->psName is the same as the passed-in name, we're done */
 	if( pn->psAName == psName )
@@ -2294,7 +2294,7 @@ void node_set_nameW(node_t * pn, const wchar_t * psName)
 
 }
 
-static void NODE_INTERNAL_FUNC node_set_nameW_internal( node_t * pn, const wchar_t * psName )
+static void node_set_nameW_internal( node_t * pn, const wchar_t * psName )
 {
 	/* if pn->psName is the same as the passed-in name, we're done */
 	if( pn->psWName == psName )
@@ -2363,7 +2363,7 @@ void node_dumpA( const node_t * pn, FILE * pfOut, int nOptions )
 	fflush( pfOut );
 }
 
-static void NODE_INTERNAL_FUNC node_dumpA_internal( const node_t * pn, struct node_dump * pd )
+static void node_dumpA_internal( const node_t * pn, struct node_dump * pd )
 {
 	node_t * pnElt;
 	float fTemp;
@@ -2622,7 +2622,7 @@ static void NODE_INTERNAL_FUNC node_dumpA_internal( const node_t * pn, struct no
 	return;
 }
 
-static inline void NODE_INTERNAL_FUNC node_write_spacesA( FILE * pfOut, int nSpaces )
+static inline void node_write_spacesA( FILE * pfOut, int nSpaces )
 {
 	int nChunk = 0;
 	for( int n = nSpaces; n > 0; n -= nChunk )
@@ -2653,7 +2653,7 @@ void node_dumpW( const node_t * pn, FILE * pfOut, int nOptions )
 }
 
 
-static void NODE_INTERNAL_FUNC node_dumpW_internal( const node_t * pn, struct node_dump * pd )
+static void node_dumpW_internal( const node_t * pn, struct node_dump * pd )
 {
 	int i;
 	node_t * pnElt;
@@ -2908,7 +2908,7 @@ static void NODE_INTERNAL_FUNC node_dumpW_internal( const node_t * pn, struct no
 	return;
 }
 
-static inline void NODE_INTERNAL_FUNC node_write_spacesW( FILE * pfOut, int nSpaces )
+static inline void node_write_spacesW( FILE * pfOut, int nSpaces )
 {
 	int nChunk = 0;
 	for( int n = nSpaces; n > 0; n -= nChunk )
@@ -3108,7 +3108,7 @@ int node_parse_from_string_dbgW( const char * psFile, int nLine, const wchar_t *
 	return node_parse_internalW( &nr, ppn, NODE_W );
 }
 
-static int NODE_INTERNAL_FUNC node_parse_from_data_internal( const void * pv, size_t nBytes, node_t ** ppn, int nType )
+static int node_parse_from_data_internal( const void * pv, size_t nBytes, node_t ** ppn, int nType )
 {
 	int nLength = 128;
 	if( nBytes < 128 )
@@ -3165,7 +3165,7 @@ int node_parse_from_data_dbgW( const char * psFile, int nLine, const void * pv, 
 	return node_parse_from_data_internal( pv, nBytes, ppn, NODE_W );
 }
 
-static int NODE_INTERNAL_FUNC node_parse_internal( FILE * pfIn, node_t ** ppn, int nOutputStyle )
+static int node_parse_internal( FILE * pfIn, node_t ** ppn, int nOutputStyle )
 {
 	/* save the file position */
 	fpos_t fpt = {0};
@@ -3262,7 +3262,7 @@ public:
  *	for a return of NP_NODE, ppn is set to the node read; otherwise, it is set
  *	to NULL.
  ***********************************************************************/
-static int NODE_INTERNAL_FUNC node_parse_internalA( NodeReader * pnr, node_t ** ppn, int nOutputStyle )
+static int node_parse_internalA( NodeReader * pnr, node_t ** ppn, int nOutputStyle )
 {
 	const char * psLine = NULL;
 	const char * psEnd = NULL;
@@ -3537,7 +3537,7 @@ PARSE_ERROR:
 	return NP_SERROR;
 }
 
-static int NODE_INTERNAL_FUNC node_parse_internalW( NodeReader *pnr, node_t ** ppn, int nOutputStyle )
+static int node_parse_internalW( NodeReader *pnr, node_t ** ppn, int nOutputStyle )
 {
 	const wchar_t * psLine = NULL;
 	const wchar_t * psEnd = NULL;
@@ -3833,7 +3833,7 @@ node_t * node_copy( const node_t *pnSource )
 	return node_copy_internal( node_pArena, pnSource );
 }
 
-static node_t * NODE_INTERNAL_FUNC node_copy_internal( node_arena * pArena, const node_t * pnSource )
+static node_t * node_copy_internal( node_arena * pArena, const node_t * pnSource )
 {
 	int i;
 
@@ -3946,7 +3946,7 @@ static node_t * NODE_INTERNAL_FUNC node_copy_internal( node_arena * pArena, cons
 }
 
 /* safely copy a string */
-static char * NODE_INTERNAL_FUNC node_safe_copyA( struct node_arena * pArena, const char * ps )
+static char * node_safe_copyA( struct node_arena * pArena, const char * ps )
 {
 	char * psCopy;
 	size_t length;
@@ -3963,7 +3963,7 @@ static char * NODE_INTERNAL_FUNC node_safe_copyA( struct node_arena * pArena, co
 }
 
 /* safely copy W string */
-static wchar_t * NODE_INTERNAL_FUNC node_safe_copyW( struct node_arena * pArena, const wchar_t * ps )
+static wchar_t * node_safe_copyW( struct node_arena * pArena, const wchar_t * ps )
 {
 	wchar_t * psCopy;
 
@@ -3990,7 +3990,7 @@ static __inline int printable(int c)
  Private Function Implementations
  ********************************/
 
-static void NODE_INTERNAL_FUNC node_set_int( node_t * pn, int nValue )
+static void node_set_int( node_t * pn, int nValue )
 {
 	/* clean up */
 	node_cleanup( pn );
@@ -4000,7 +4000,7 @@ static void NODE_INTERNAL_FUNC node_set_int( node_t * pn, int nValue )
 	pn->nType = NODE_INT;
 }
 
-static void NODE_INTERNAL_FUNC node_set_int64( node_t * pn, int64_t nValue )
+static void node_set_int64( node_t * pn, int64_t nValue )
 {
 	/* clean up */
 	node_cleanup( pn );
@@ -4010,7 +4010,7 @@ static void NODE_INTERNAL_FUNC node_set_int64( node_t * pn, int64_t nValue )
 	pn->nType = NODE_INT64;
 }
 
-static void NODE_INTERNAL_FUNC node_set_real( node_t * pn, double dfValue )
+static void node_set_real( node_t * pn, double dfValue )
 {
 	/* clean up */
 	node_cleanup( pn );
@@ -4020,7 +4020,7 @@ static void NODE_INTERNAL_FUNC node_set_real( node_t * pn, double dfValue )
 	pn->nType = NODE_REAL;
 }
 
-static void NODE_INTERNAL_FUNC node_set_stringA( node_t * pn, const char * psAValue )
+static void node_set_stringA( node_t * pn, const char * psAValue )
 {
 	if(psAValue == NULL)
 	{
@@ -4046,17 +4046,17 @@ static void NODE_INTERNAL_FUNC node_set_stringA( node_t * pn, const char * psAVa
 	node_set_stringA_internal( pn, psAValue );
 }
 
-static void NODE_INTERNAL_FUNC node_set_stringA_internal( node_t * pn, const char * psAValue )
+static void node_set_stringA_internal( node_t * pn, const char * psAValue )
 {
 	node_set_stringA_internal( pn, psAValue, strlen( psAValue ) );
 }
 
-static void NODE_INTERNAL_FUNC node_set_stringA_internal( node_t * pn, const char * psAValue, const char * psEnd )
+static void node_set_stringA_internal( node_t * pn, const char * psAValue, const char * psEnd )
 {
 	node_set_stringA_internal( pn, psAValue, psEnd-psAValue );
 }
 
-static void NODE_INTERNAL_FUNC node_set_stringA_internal( node_t * pn, const char * psAValue, size_t cch )
+static void node_set_stringA_internal( node_t * pn, const char * psAValue, size_t cch )
 {
 #ifdef USE_BAGS
 	if( !pn->bBagUsed && cch < BAG_SIZE )
@@ -4079,7 +4079,7 @@ static void NODE_INTERNAL_FUNC node_set_stringA_internal( node_t * pn, const cha
 	pn->nType = NODE_STRINGA;
 }
 
-static void NODE_INTERNAL_FUNC node_set_stringW( node_t * pn, const wchar_t * psWValue )
+static void node_set_stringW( node_t * pn, const wchar_t * psWValue )
 {
 	if(psWValue == NULL)
 	{
@@ -4105,17 +4105,17 @@ static void NODE_INTERNAL_FUNC node_set_stringW( node_t * pn, const wchar_t * ps
 	node_set_stringW_internal( pn, psWValue );
 }
 
-static void NODE_INTERNAL_FUNC node_set_stringW_internal( node_t * pn, const wchar_t * psWValue )
+static void node_set_stringW_internal( node_t * pn, const wchar_t * psWValue )
 {
 	node_set_stringW_internal( pn, psWValue, wcslen( psWValue ) );
 }
 
-static void NODE_INTERNAL_FUNC node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, const wchar_t * psEnd )
+static void node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, const wchar_t * psEnd )
 {
 	node_set_stringW_internal( pn, psWValue, psEnd-psWValue );
 }
 
-static void NODE_INTERNAL_FUNC node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, size_t cch )
+static void node_set_stringW_internal( node_t * pn, const wchar_t * psWValue, size_t cch )
 {
 #ifdef USE_BAGS
 	if( !pn->bBagUsed && (sizeof(wchar_t)*cch) < BAG_SIZE )
@@ -4191,7 +4191,7 @@ node_t * node_set_data( node_t * pn, int nLength, const void * pvValue )
 	return pn;
 }
 
-static void NODE_INTERNAL_FUNC node_set_data_internal( node_t * pn, int nLength, const data_t * pbValue )
+static void node_set_data_internal( node_t * pn, int nLength, const data_t * pbValue )
 {
 	/* store the length */
 	pn->nDataLength = nLength;
@@ -4215,7 +4215,7 @@ static void NODE_INTERNAL_FUNC node_set_data_internal( node_t * pn, int nLength,
 	pn->nType = NODE_DATA;
 }
 
-static void NODE_INTERNAL_FUNC node_set_ptr( node_t * pn, void * pv )
+static void node_set_ptr( node_t * pn, void * pv )
 {
 	/* clean up */
 	node_cleanup( pn );
@@ -4228,7 +4228,7 @@ static void NODE_INTERNAL_FUNC node_set_ptr( node_t * pn, void * pv )
 
 /* set the node to a value using variable arguments. nType determines how 
 arguments are processed.*/
-static void NODE_INTERNAL_FUNC node_set_valist(node_t * pn, int nType, va_list valist)
+static void node_set_valist(node_t * pn, int nType, va_list valist)
 {
 	unsigned int nDataLength = 0;
 	data_t * pbValue = NULL;
@@ -4328,7 +4328,7 @@ static void NODE_INTERNAL_FUNC node_set_valist(node_t * pn, int nType, va_list v
 }	
 
 /* hash a string */
-unsigned int NODE_INTERNAL_FUNC node_hashA( const char * psKey )
+unsigned int node_hashA( const char * psKey )
 {
 	unsigned int nHash = 0x53378008;
 	const char * pc = NULL;
@@ -4343,7 +4343,7 @@ unsigned int NODE_INTERNAL_FUNC node_hashA( const char * psKey )
 	return (nHash & NODE_HASH_MASK);
 }
 
-unsigned int NODE_INTERNAL_FUNC node_hashW( const wchar_t * psKey )
+unsigned int node_hashW( const wchar_t * psKey )
 {
     unsigned int nHash = 0x55378008;
     const wchar_t * pc = NULL;
@@ -4359,7 +4359,7 @@ unsigned int NODE_INTERNAL_FUNC node_hashW( const wchar_t * psKey )
     return (nHash & NODE_HASH_MASK);
 }
 
-static void NODE_INTERNAL_FUNC node_cleanup( node_t * pn )
+static void node_cleanup( node_t * pn )
 {
 	int i = 0;
 
@@ -4566,7 +4566,7 @@ node_t * node_hash_keysW( const node_t * pnHash )
 	return pnList;
 }
 
-static char * NODE_INTERNAL_FUNC read_lineA( node_arena * pArena, FILE * pfIn, char ** ppsEnd )
+static char * read_lineA( node_arena * pArena, FILE * pfIn, char ** ppsEnd )
 {
 	int nBufferSize = 40;
 	char * psBuffer = NULL;
@@ -4640,7 +4640,7 @@ static char * NODE_INTERNAL_FUNC read_lineA( node_arena * pArena, FILE * pfIn, c
 	return psBuffer;
 }
 
-static wchar_t * NODE_INTERNAL_FUNC read_lineW( node_arena * pArena, FILE * pfIn, wchar_t ** ppsEnd )
+static wchar_t * read_lineW( node_arena * pArena, FILE * pfIn, wchar_t ** ppsEnd )
 {
 	int nBufferSize = 40;
 	wchar_t * psBuffer = NULL;
@@ -4716,7 +4716,7 @@ READ_CHAR:
 	return psBuffer;
 }
 
-static char * NODE_INTERNAL_FUNC node_escapeA( struct node_arena * pArena, const char * psUnescaped )
+static char * node_escapeA( struct node_arena * pArena, const char * psUnescaped )
 {
 	char * psEscaped = NULL;
 	char * psE = NULL;
@@ -4749,7 +4749,7 @@ static char * NODE_INTERNAL_FUNC node_escapeA( struct node_arena * pArena, const
 	return psEscaped;
 }
 
-static wchar_t * NODE_INTERNAL_FUNC node_escapeW( struct node_arena * pArena, const wchar_t * psUnescaped )
+static wchar_t * node_escapeW( struct node_arena * pArena, const wchar_t * psUnescaped )
 {
 	wchar_t * psEscaped = NULL;
 	wchar_t * psE = NULL;
@@ -4783,7 +4783,7 @@ static wchar_t * NODE_INTERNAL_FUNC node_escapeW( struct node_arena * pArena, co
 	return psEscaped;
 }
 
-static char * NODE_INTERNAL_FUNC node_unescapeA( struct node_arena * pArena, const char * psEscaped, const char * psEnd )
+static char * node_unescapeA( struct node_arena * pArena, const char * psEscaped, const char * psEnd )
 {
 	char * psUnescaped = (char *)node_malloc( pArena, psEnd-psEscaped+1 );
 	const char * psE = psEscaped;
@@ -4816,7 +4816,7 @@ static char * NODE_INTERNAL_FUNC node_unescapeA( struct node_arena * pArena, con
 	return psUnescaped;
 }
 
-static wchar_t * NODE_INTERNAL_FUNC node_unescapeW( struct node_arena * pArena, const wchar_t * psEscaped, const wchar_t * psEnd )
+static wchar_t * node_unescapeW( struct node_arena * pArena, const wchar_t * psEscaped, const wchar_t * psEnd )
 {
 	wchar_t * psUnescaped = (wchar_t *)node_malloc( pArena, (psEnd-psEscaped+1)*sizeof(wchar_t) );
 	const wchar_t * psE = psEscaped;
@@ -4849,17 +4849,17 @@ static wchar_t * NODE_INTERNAL_FUNC node_unescapeW( struct node_arena * pArena, 
 	return psUnescaped;
 }
 
-static char * NODE_INTERNAL_FUNC WToA( node_arena * pArena, const wchar_t * psW )
+static char * WToA( node_arena * pArena, const wchar_t * psW )
 {
 	return WToA( pArena, psW, wcslen(psW) );
 }
 
-static char * NODE_INTERNAL_FUNC WToA( node_arena * pArena, const wchar_t * psW, const wchar_t * psWEnd )
+static char * WToA( node_arena * pArena, const wchar_t * psW, const wchar_t * psWEnd )
 {
 	return WToA( pArena, psW, psWEnd - psW );
 }
 
-static char * NODE_INTERNAL_FUNC WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
+static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
 {
 	char * psA = NULL;
 
@@ -4874,17 +4874,17 @@ static char * NODE_INTERNAL_FUNC WToA( node_arena * pArena, const wchar_t * psW,
 	return psA;
 }
 
-static wchar_t * NODE_INTERNAL_FUNC AToW( node_arena * pArena, const char * psA )
+static wchar_t * AToW( node_arena * pArena, const char * psA )
 {
 	return AToW( pArena, psA, strlen(psA) );
 }
 
-static wchar_t * NODE_INTERNAL_FUNC AToW( node_arena * pArena, const char * psA, const char * psAEnd )
+static wchar_t * AToW( node_arena * pArena, const char * psA, const char * psAEnd )
 {
 	return AToW( pArena, psA, psAEnd-psA );
 }
 
-static wchar_t * NODE_INTERNAL_FUNC AToW( node_arena * pArena, const char * psA, size_t nLength )
+static wchar_t * AToW( node_arena * pArena, const char * psA, size_t nLength )
 {
 	wchar_t * psW = NULL;
 
@@ -4933,7 +4933,7 @@ void node_set_error_funcs( node_error_func_t pErrFunc, node_memory_func_t pMemFu
 	node_pfAssert = reinterpret_cast<node_assert_func_internal_t>(pAssertFunc);
 }
 
-static void NODE_INTERNAL_FUNC _node_assert( void * psExpr, const char * psFile, unsigned int nLine )
+static void _node_assert( void * psExpr, const char * psFile, unsigned int nLine )
 {
 	if( node_pfAssert != NULL )
 	{
@@ -4944,7 +4944,7 @@ static void NODE_INTERNAL_FUNC _node_assert( void * psExpr, const char * psFile,
 	}
 }
 
-static void NODE_INTERNAL_FUNC node_error( char * psError, ... )
+static void node_error( char * psError, ... )
 {
 	char acBuffer[1024] = {0};
 	va_list ap;
@@ -4959,7 +4959,7 @@ static void NODE_INTERNAL_FUNC node_error( char * psError, ... )
 	}
 }
 
-static int NODE_INTERNAL_FUNC node_memory( size_t cb )
+static int node_memory( size_t cb )
 {
 	if( node_pfMemory == NULL )
 		return NODE_MEMORY_FAIL;
@@ -4968,9 +4968,9 @@ static int NODE_INTERNAL_FUNC node_memory( size_t cb )
 }
 
 #ifdef USE_DL_MALLOC
-void * NODE_INTERNAL_FUNC node_malloc( struct node_arena * pArena, size_t cb )
+void * node_malloc( struct node_arena * pArena, size_t cb )
 #else
-void * NODE_INTERNAL_FUNC node_malloc( struct node_arena * , size_t cb )
+void * node_malloc( struct node_arena * , size_t cb )
 #endif
 {
 	int nRetry = 0;
@@ -5008,7 +5008,7 @@ RETRY:
 }
 
 #if defined(USE_DL_MALLOC)
-static void * NODE_INTERNAL_FUNC node_valloc( struct node_arena * pArena, size_t nSize )
+static void * node_valloc( struct node_arena * pArena, size_t nSize )
 {
 	int nRetry = 0;
 
@@ -5054,7 +5054,7 @@ void freelist_cleanup()
 /*******************
  Debugging Functions
  *******************/
-static void NODE_INTERNAL_FUNC node_check_ascii_string( const char * psValue, const char * psContext )
+static void node_check_ascii_string( const char * psValue, const char * psContext )
 {
 	int nType = node_string_type( (const unsigned char *)psValue );
 
@@ -5065,7 +5065,7 @@ static void NODE_INTERNAL_FUNC node_check_ascii_string( const char * psValue, co
 	}
 }
 
-static void NODE_INTERNAL_FUNC node_check_unicode_string( const wchar_t * psValue, const char * psContext )
+static void node_check_unicode_string( const wchar_t * psValue, const char * psContext )
 {
 	int nType = node_string_type( (const unsigned char *)psValue );
 
@@ -5076,7 +5076,7 @@ static void NODE_INTERNAL_FUNC node_check_unicode_string( const wchar_t * psValu
 	}
 }
 
-static int NODE_INTERNAL_FUNC node_string_type( const unsigned char * psValue )
+static int node_string_type( const unsigned char * psValue )
 {
 	size_t cb = strlen( (char *)psValue );
 	if( cb == 1 )
@@ -5188,7 +5188,7 @@ size_t node_delete_arena( node_arena_t  )
 
 
 #ifdef NODE_DLL
-static void NODE_INTERNAL_FUNC TLSThreadCleanup()
+static void TLSThreadCleanup()
 {
 	node_tls * ptls = GetTLS();
 	if( ptls != NULL )

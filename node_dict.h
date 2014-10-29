@@ -58,21 +58,21 @@ typedef struct dict_t
     dnode_t dict_nilnode;
 } dict_t;
 
-extern dict_t * NODE_INTERNAL_FUNC dict_create();
-extern void NODE_INTERNAL_FUNC dict_free_nodes(dict_t *);
+extern dict_t * dict_create();
+extern void dict_free_nodes(dict_t *);
 
-extern dnode_t * NODE_INTERNAL_FUNC dict_lookupA(dict_t *, const char *);
-extern dnode_t * NODE_INTERNAL_FUNC dict_ensure_existsA(dict_t *dict, const char *key );
+extern dnode_t * dict_lookupA(dict_t *, const char *);
+extern dnode_t * dict_ensure_existsA(dict_t *dict, const char *key );
 
-extern dnode_t * NODE_INTERNAL_FUNC dict_lookupW(dict_t *, const wchar_t *);
-extern dnode_t * NODE_INTERNAL_FUNC dict_ensure_existsW(dict_t *dict, const wchar_t *key );
+extern dnode_t * dict_lookupW(dict_t *, const wchar_t *);
+extern dnode_t * dict_ensure_existsW(dict_t *dict, const wchar_t *key );
 
-extern dnode_t * NODE_INTERNAL_FUNC dict_delete(dict_t *, dnode_t *);
+extern dnode_t * dict_delete(dict_t *, dnode_t *);
 
-extern dnode_t * NODE_INTERNAL_FUNC dict_first(dict_t *);
-extern dnode_t * NODE_INTERNAL_FUNC dict_next(dict_t *, dnode_t *);
+extern dnode_t * dict_first(dict_t *);
+extern dnode_t * dict_next(dict_t *, dnode_t *);
 
-extern dnode_t * NODE_INTERNAL_FUNC dnode_init(dnode_t *);
+extern dnode_t * dnode_init(dnode_t *);
 
 #ifdef __cplusplus
 }
