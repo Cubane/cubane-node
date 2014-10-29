@@ -73,6 +73,10 @@ void node_mutex_lock(node_mutex *nm) {
 void node_mutex_unlock(node_mutex *nm) {
   LeaveCriticalSection( nm );
 }
+
+#define NODE_DFMT64 "%I64dL"
+#define NODE_XFMT64 "0x%016I64X"
+
 #else
 #include <pthread.h>
 
@@ -86,6 +90,11 @@ void node_mutex_lock(node_mutex *nm) {
 void node_mutex_unlock(node_mutex *nm) {
   pthread_mutex_unlock( nm );
 }
+
+template <typename T> T __min(T a, T b) { return a<b?a:b; }
+
+#define NODE_DFMT64 "%dll"
+#define NODE_XFMT64 "0x%016Xll"
 #endif
 
 /* Malloc specials */
@@ -1145,7 +1154,7 @@ NODE_CONSTOUT char * node_get_stringA( node_t *pn )
 		}
 
 		/* convert nValue into psValue */
-		_itoa( pn->nValue, acBuffer, 10 );
+		sprintf( acBuffer, "%d", pn->nValue, acBuffer );
 		pn->psAValue = node_safe_copyA( pn->pArena, acBuffer );
 
 		/* return psValue */
@@ -2435,7 +2444,8 @@ static void node_dumpA_internal( const node_t * pn, struct node_dump * pd )
 		break;
 
 	case NODE_INT64:
-		fprintf( pfOut, "%I64dL  (0x%016I64X)\r\n", pn->n64Value, pn->n64Value );
+               
+		fprintf( pfOut, NODE_DFMT64 "  (" NODE_XFMT64 ")\r\n", pn->n64Value, pn->n64Value );
 		break;
 
 	case NODE_REAL:

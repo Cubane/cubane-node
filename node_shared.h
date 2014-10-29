@@ -22,7 +22,7 @@ unsigned int node_hashW( const wchar_t * psKey );
 
 #if !defined(_MSC_VER)
 #define _stricmp strcasecmp
-template <typename T> __min(T a, T b) { return a<b?a:b; }
+#define _atoi64  atoll
 #define TRUE 1
 
 
