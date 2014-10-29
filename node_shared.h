@@ -19,6 +19,10 @@ unsigned int node_hashW( const wchar_t * psKey );
 #ifndef CP_UTF8
 #define CP_UTF8 65001
 #endif
+
+#if defined(_MSC_VER)
+#define _stricmp strcasecmp
+#endif
  
 #ifdef __cplusplus
 }

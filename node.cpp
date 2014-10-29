@@ -62,6 +62,30 @@
 
 #define DIMENSION( A ) ( (sizeof A)/(sizeof A[0]) )
 
+#if defined(_MSC_VER)
+#define node_mutex CRITICAL_SECTION
+int node_mutex_init(node_mutex *nm) {
+  return InitializeCriticalSection(nm);
+}
+void node_mutex_lock(node_mutex *nm) {
+  EnterCriticalSection( nm );
+}
+void node_mutex_unlock(node_mutex *nm) {
+  LeaveCriticalSection( nm );
+}
+#else
+#define node_mutex pthread_mutex_t
+int node_mutex_init(node_mutex * nm) {
+  return pthread_mutex_init(nm);
+}
+void node_mutex_lock(node_mutex *nm) {
+  pthread_mutex_lock( nm );
+}
+void node_mutex_unlock(node_mutex *nm) {
+  pthread_mutex_unlock( nm );
+}
+#endif
+
 /* Malloc specials */
 #ifdef USE_DL_MALLOC
 extern "C" extern struct malloc_state _gm_;
@@ -76,7 +100,7 @@ struct node_arena
 
 	mspace pSpace;
 	node_t * pnFreeList;
-	CRITICAL_SECTION csFreeList;
+	node_mutex csFreeList;
 	va * pVA;
 };
 
@@ -224,10 +248,10 @@ public:
 
 class node_lock
 {
-	CRITICAL_SECTION * m_cs;
+	node_mutex * m_cs;
 public:
-	node_lock( CRITICAL_SECTION *cs ) : m_cs(cs) { EnterCriticalSection( m_cs ); }
-	~node_lock() { LeaveCriticalSection( m_cs ); }
+  node_lock( node_mutex *cs ) : m_cs(cs) {node_mutex_lock(m_)cs);}
+  ~node_lock() { node_mutex_unlock(m_cs); }
 };
 
 /****************
@@ -451,8 +475,8 @@ static inline void node_write_spacesW( FILE * pfOut, int nSpaces );
 static int node_memory( size_t cb );
 static void node_error( char * psError, ... );
 
+static void _node_assert( const char *, const char *, unsigned int );
 #define node_assert(exp) (void)( (exp) || (_node_assert(#exp, __FILE__, __LINE__), 0) )
-static void _node_assert( void *, const char *, unsigned int );
 
 static int __inline hash_to_bucket( const node_t * pnHash, int nHash );
 
@@ -4933,7 +4957,7 @@ void node_set_error_funcs( node_error_func_t pErrFunc, node_memory_func_t pMemFu
 	node_pfAssert = reinterpret_cast<node_assert_func_internal_t>(pAssertFunc);
 }
 
-static void _node_assert( void * psExpr, const char * psFile, unsigned int nLine )
+static void _node_assert( const char * psExpr, const char * psFile, unsigned int nLine )
 {
 	if( node_pfAssert != NULL )
 	{
