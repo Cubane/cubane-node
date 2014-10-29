@@ -20,9 +20,15 @@ unsigned int node_hashW( const wchar_t * psKey );
 #define CP_UTF8 65001
 #endif
 
-#if defined(_MSC_VER)
+#if !defined(_MSC_VER)
 #define _stricmp strcasecmp
+template <typename T> __min(T a, T b) { return a<b?a:b; }
+#define TRUE 1
+
+
 #endif
+
+
  
 #ifdef __cplusplus
 }
