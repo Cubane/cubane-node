@@ -6,6 +6,9 @@
       "sources": [
         "node.cpp"
       ],
+      "libraries": [
+      "-liconv"
+      ]
     },
     {
       "target_name": "catch-test",
@@ -22,6 +25,9 @@
       ],
       'cflags!': [ '-fno-exceptions' ],
       'cflags_cc!': [ '-fno-exceptions' ],
+      "libraries": [
+      "-liconv"
+      ],
       'conditions': [
         ['OS=="mac"', {
           'xcode_settings': {

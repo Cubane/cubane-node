@@ -101,7 +101,15 @@ template <typename T> T __max(T a, T b) { return a>b?a:b; }
 #define NODE_XFMT64 "0x%016llX"
 
 int IsTextUnicode( const void * pv, int nLength, int * iFlags) {
-  // TODO: check for BOM, valid UTF-8
+  const wchar_t wBOM = 0xFEFF;
+
+  wchar_t * pW = (wchar_t*)pv;
+  if ( pW[0] == wBOM ) {
+    return 1;
+  }
+  // TODO: check for valid UTF-8
+
+
   // TODO: use iconv
   return 0;
 }
