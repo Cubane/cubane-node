@@ -2,6 +2,7 @@
   "targets": [
     {
       "target_name": "node",
+      "type": "static_library",
       "sources": [
         "node.cpp"
       ],
