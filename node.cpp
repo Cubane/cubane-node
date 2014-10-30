@@ -36,7 +36,7 @@
 // needs to be defined at project level to affect all files -- set in DSP file
 
 /* optional: small speed improvement when hashes used frequently */
-#define USE_BAGS					/* allocate extra space after node for (small) string storage instead of using free store */
+//#define USE_BAGS					/* allocate extra space after node for (small) string storage instead of using free store */
 
 /***********************************
  Error checking on above definitions
@@ -421,7 +421,7 @@ static inline void byte_to_strA( char *& ps, unsigned int b )
 #else
 #define BAG_SIZE		0
 #define GET_BAG( pn ) (assert(0))
-#pragma warning( disable: 4127 )
+
 #define IS_BAG( pn, ps ) 0
 #endif
 
@@ -3809,8 +3809,6 @@ static void node_cleanup( node_t * pn )
 					char acBuffer[1024];
 					sprintf( acBuffer, "%s Node hash debugging: hash has load factor %.2f (%d/%d)\n",
 						pn->psHashAllocated, dfLoad, nMaxElts, pn->nHashBuckets );
-//					fputs( acBuffer, stderr );
-					OutputDebugStringA( acBuffer );
 				}
 
 				nfree( pn->pArena, pn->psHashAllocated );
@@ -4366,7 +4364,7 @@ RETRY:
 	pv = mspace_malloc( pArena->pSpace, cb );
 #else
 
-#if defined(_DEBUG)
+#if defined(_DEBUG) && defined(_MSC_VER)
 	if( node_source_file == NULL )
 		pv = malloc( cb );
 	else

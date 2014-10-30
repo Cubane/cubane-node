@@ -23,6 +23,7 @@ unsigned int node_hashA( const char * psKey );
 #define _stricmp strcasecmp
 #define _atoi64  atoll
 #define _vsnprintf_s vsnprintf
+#define _snprintf snprintf
 #define TRUE 1
 #define FALSE 0
 
