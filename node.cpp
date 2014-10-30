@@ -36,7 +36,7 @@
 // needs to be defined at project level to affect all files -- set in DSP file
 
 /* optional: small speed improvement when hashes used frequently */
-//#define USE_BAGS					/* allocate extra space after node for (small) string storage instead of using free store */
+#define USE_BAGS					/* allocate extra space after node for (small) string storage instead of using free store */
 
 /***********************************
  Error checking on above definitions
@@ -116,6 +116,31 @@ int IsTextUnicode( const void * pv, int nLength, int * iFlags) {
 
 #endif
 
+/* Malloc specials */
+#ifdef USE_DL_MALLOC
+extern "C" extern struct malloc_state _gm_;
+
+struct node_arena
+{
+	struct va
+	{
+		va( va * p ) : next(p) {}
+		va * next;
+	};
+
+	mspace pSpace;
+	node_t * pnFreeList;
+	node_mutex csFreeList;
+	va * pVA;
+};
+
+struct node_arena g_GlobalArena = { &_gm_, NULL, {0}, 0 };
+
+static void inline nfree( node_arena * pArena, void * pv )
+{
+	mspace_free( pArena->pSpace, pv );
+}
+#else
 struct node_arena
 {
 	int nDummy;
@@ -126,6 +151,7 @@ static void inline nfree( node_arena * , void * pv )
 {
 	free( pv );
 }
+#endif
 
 /*************************************
  Debug/Release adjustments to #defines
@@ -533,6 +559,10 @@ static void hash_rebalance( node_t * pnHash, int nNewBuckets );
 #define NODE_STRING_ASCII		2
 #define NODE_STRING_UNICODE		3
 
+#ifdef USE_DL_MALLOC
+static void * node_valloc( node_arena * pArena, size_t nSize );
+#endif
+
 void * node_malloc( struct node_arena * pArena, size_t cb );
 
 /***********************************************
@@ -625,11 +655,55 @@ static node_t * node_alloc_internal( node_arena * pArena )
 {
 	node_t * pnNew = NULL;
 
+#ifdef USE_DL_MALLOC
+	{
+		node_lock l( &pArena->csFreeList );
+		if( pArena->pnFreeList != NULL )
+		{
+			pnNew = pArena->pnFreeList;
+			pArena->pnFreeList = pnNew->pnNext;
+		}
+
+		if( pnNew == NULL )
+		{
+			/* allocate some more space */
+
+#ifdef USE_BAGS
+			const size_t nNodeSize = NODE_SIZE + BAG_SIZE;
+#else
+			const size_t nNodeSize = NODE_SIZE;
+#endif
+			/* reserve 16 bytes for dlmalloc page overhead */
+			const size_t nArenaSize = 65536;
+			const size_t nCount = (nArenaSize-sizeof(node_arena::va))/ nNodeSize;
+
+			char * pcArena = reinterpret_cast<char*>(node_valloc( pArena, nArenaSize ) );
+
+			/* build freelist */
+			node_t * pnLast = reinterpret_cast<node_t*>( pcArena + (nCount-1) * nNodeSize );
+			pnLast->pnNext = pArena->pnFreeList;
+
+			
+			for( unsigned int i = nCount-2; i > 0; --i )
+			{
+				node_t * pn = reinterpret_cast<node_t*>( pcArena + i * nNodeSize );
+				pn->pnNext = pnLast;
+				pnLast = pn;
+			}
+
+			pArena->pnFreeList = pnLast;
+
+			pnNew = reinterpret_cast<node_t*>(pcArena);
+
+		}
+	}
+#endif /* USE_DL_MALLOC */
+
 	// BAG_SIZE == 0 if not USE_BAGS, so below is OK
 	if( pnNew == NULL )
 		pnNew = reinterpret_cast<node_t *>(node_malloc( pArena, NODE_SIZE + BAG_SIZE ));
 
-	memset( pnNew, 0, NODE_SIZE+BAG_SIZE );
+	memset( pnNew, 0, NODE_SIZE );
 	pnNew->pArena = pArena;
 
 	return pnNew;
@@ -668,8 +742,15 @@ static void node_free_internal( node_t * pn, unsigned int bInCollection )
 		/* free and NULL all members of pn (type specific) */
 		node_cleanup( pn );
 
+#ifdef USE_DL_MALLOC
+		{
+			node_lock l(&pArena->csFreeList );
+			pn->pnNext = pArena->pnFreeList;
+			pArena->pnFreeList = pn;
+		}
+#else
 		nfree( pArena, pn );
-
+#endif
 		pn = pnSaved;
 
 	} /* while (pn is not null) */
@@ -1181,26 +1262,22 @@ NODE_CONSTOUT wchar_t * node_get_stringW(node_t *pn)
 	case NODE_REAL:
 	case NODE_LIST:
 
-          if ( pn->psAValue != NULL ) {
+          if ( pn->psAValue == NULL ) {
             nfree( pn->pArena, pn->psAValue );
-            pn->psAValue = NULL;
           }
 
           // force implicit conversion to A string
           node_get_stringA(pn);
-          node_assert( pn->psAValue != NULL );
 
           /** fallthrough **/
 	case NODE_STRINGA:
-          if( pn->psWValue == NULL ) {
-            pn->psWValue = AToW( pn->pArena, pn->psAValue );
-            node_assert( pn->psWValue != NULL );
-          }
-          
-          return pn->psWValue;
+		if( pn->psWValue == NULL )
+			pn->psWValue = AToW( pn->pArena, pn->psAValue );
+
+		return pn->psWValue;
 
 	case NODE_STRINGW:
-          return pn->psWValue;
+		return pn->psWValue;
 
 	default:	/* invalid */
 		node_assert(!"Node cannot be converted to string"); /* invalid node type: fail gracefully by returning empty string */
@@ -4160,14 +4237,25 @@ static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
 static wchar_t * AToW( node_arena * pArena, const char * psA, size_t nLength )
 {
 	wchar_t * psW = NULL;
+        char * psWc = NULL;
+	wchar_t * psWStart = NULL;
         size_t nOut;
+
+        iconv_t cd = iconv_open("UTF-8", "UTF-16");
 
         nOut = nLength+2;
         psW = (wchar_t *)node_malloc(pArena, sizeof(wchar_t)*nOut);
+        psWc = (char *)psW;
+        psWStart = psW;
 
-        size_t nResult = mbstowcs(psW, psA, nOut);
+        size_t nResult = iconv(cd, (char**)&psA, &nLength, &psWc, &nOut);
+        if (nResult == (size_t)(-1)) {
+          node_error("AToW conversion error");
+        }
+        psW = (wchar_t *)psWc;
+        *psW = (wchar_t)0;
 
-        return psW;
+        return psWStart;
 }
 
 static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
@@ -4175,7 +4263,6 @@ static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
   char * psA = NULL;
   char * psAStart = NULL;
         size_t nOut;
-        size_t nBytesIn;
 
         iconv_t cd = iconv_open("UTF-16", "UTF-8");
 
@@ -4183,8 +4270,7 @@ static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
         psA = (char *)node_malloc(pArena, sizeof(char)*nOut);
         psAStart = psA;
 
-        nBytesIn = cch * sizeof(wchar_t);
-        size_t nResult = iconv(cd, (char**)&psW, &nBytesIn, &psA, &nOut);
+        size_t nResult = iconv(cd, (char**)&psW, &cch, &psA, &nOut);
         if (nResult == (size_t)(-1)) {
           node_error("WToA conversion error");
         }
@@ -4268,12 +4354,23 @@ static int node_memory( size_t cb )
 		return node_pfMemory( cb );
 }
 
+#ifdef USE_DL_MALLOC
+void * node_malloc( struct node_arena * pArena, size_t cb )
+#else
 void * node_malloc( struct node_arena * , size_t cb )
+#endif
 {
 	int nRetry = 0;
 
 RETRY:
 	void * pv = NULL;
+
+#if defined(USE_DL_MALLOC) || defined(DEBUG_DL_MALLOC)
+	/* round up to multiple of 4 */
+	cb = (cb + 3) & (~3);
+
+	pv = mspace_malloc( pArena->pSpace, cb );
+#else
 
 #if defined(_DEBUG) && defined(_MSC_VER)
 	if( node_source_file == NULL )
@@ -4282,6 +4379,8 @@ RETRY:
 		pv = _malloc_dbg( cb, _NORMAL_BLOCK, node_source_file, node_source_line );
 #else
 	pv = malloc( cb );
+#endif
+
 #endif
 
 	if( pv == NULL ) 
@@ -4294,6 +4393,32 @@ RETRY:
 
 	return pv;
 }
+
+#if defined(USE_DL_MALLOC)
+static void * node_valloc( struct node_arena * pArena, size_t nSize )
+{
+	int nRetry = 0;
+
+RETRY:
+	void * pv = VirtualAlloc( NULL, nSize, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE );
+
+	if( pv == NULL ) 
+	{
+		if( node_memory( nSize ) == NODE_MEMORY_RETRY && nRetry++ < 10 )
+			goto RETRY;
+		else
+			exit(1);
+	}
+
+	// stash a pointer on the arena so we can clean it later
+	node_arena::va * pVA = (node_arena::va *)pv;
+	pVA->next = pArena->pVA;
+	pArena->pVA = pVA;
+
+	return (char * )pv + sizeof(node_arena::va);
+
+}
+#endif
 
 static int __inline hash_to_bucket( const node_t * pnHash, int nHash )
 {
@@ -4313,6 +4438,68 @@ void freelist_cleanup()
 }
 
 
+#ifdef USE_DL_MALLOC
+node_arena_t node_create_arena( size_t size )
+{
+	/* create a new arena and don't select it */
+	
+	/* alloc from global arena so we can't be F'ed up by being destroyed along with some other arena... */
+	node_arena * pNewArena = (node_arena *)node_malloc( &g_GlobalArena, sizeof(node_arena) );
+
+	pNewArena->pSpace = create_mspace( size, 0 );
+	pNewArena->pnFreeList = NULL;
+	InitializeCriticalSection( &(pNewArena->csFreeList) );
+	pNewArena->pVA = NULL;
+
+	return (node_arena_t)pNewArena;
+}
+
+node_arena_t node_get_arena()
+{
+	return (node_arena_t)node_pArena;
+}
+
+node_arena_t node_set_arena( node_arena_t pNewArena )
+{
+	node_arena * pOld = node_pArena;
+
+	node_pArena = (node_arena *)pNewArena;
+
+	return (node_arena_t)pOld;
+}
+
+size_t node_delete_arena( node_arena_t pToDelete )
+{
+	node_arena * pArena = (node_arena *)pToDelete;
+	if( pArena == &g_GlobalArena )
+	{
+		node_error( "Error! Attempting to delete global arena!\n" );
+		return 0;
+	}
+
+	if( pArena == node_pArena )
+	{
+		/* deleting current arena - set current to global */
+		pArena = &g_GlobalArena;
+		/* other threads might have as current the arena we are about to delete.  If so, too bad! */
+	}
+
+	/* free the vas */
+	node_arena::va * pVANext;
+	for( node_arena::va * pVA = pArena->pVA; pVA != NULL; pVA = pVANext )
+	{
+		pVANext = pVA->next;
+		VirtualFree( pVA, 0, MEM_RELEASE );
+	}
+
+	size_t result = destroy_mspace( pArena->pSpace );
+	pArena->pnFreeList = NULL;
+	DeleteCriticalSection( &(pArena->csFreeList) );
+	nfree( &g_GlobalArena, pArena );
+
+	return result;
+}
+#else
 node_arena_t node_create_arena( size_t )
 {
 	return NULL;
@@ -4332,6 +4519,7 @@ size_t node_delete_arena( node_arena_t  )
 {
 	return 0;
 }
+#endif
 
 
 
@@ -4346,6 +4534,9 @@ public:
 
 //		FreeLibrary( hKernel );
 
+#ifdef USE_DL_MALLOC
+		InitializeCriticalSection( &(g_GlobalArena.csFreeList) );
+#endif
 //		_CrtSetBreakAlloc( 1380 );
 
 		node_tls_alloc();
@@ -4353,6 +4544,10 @@ public:
 
 	~LibSetup()
 	{
+#ifdef USE_DL_MALLOC
+		DeleteCriticalSection( &(g_GlobalArena.csFreeList) );
+		memset( &(g_GlobalArena.csFreeList), 0, sizeof(g_GlobalArena.csFreeList) );
+#endif
 
                 node_tls_free();
 	}
