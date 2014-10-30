@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/Cubane/cubane-node",
   "devDependencies": {
+    "catch": "^1.0.48",
     "istanbul": "^0.3.2",
     "mocha": "^2.0.1"
   }
