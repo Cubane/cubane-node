@@ -629,7 +629,7 @@ static node_t * node_alloc_internal( node_arena * pArena )
 	if( pnNew == NULL )
 		pnNew = reinterpret_cast<node_t *>(node_malloc( pArena, NODE_SIZE + BAG_SIZE ));
 
-	memset( pnNew, 0, NODE_SIZE );
+	memset( pnNew, 0, NODE_SIZE+BAG_SIZE );
 	pnNew->pArena = pArena;
 
 	return pnNew;
@@ -1181,22 +1181,26 @@ NODE_CONSTOUT wchar_t * node_get_stringW(node_t *pn)
 	case NODE_REAL:
 	case NODE_LIST:
 
-          if ( pn->psAValue == NULL ) {
+          if ( pn->psAValue != NULL ) {
             nfree( pn->pArena, pn->psAValue );
+            pn->psAValue = NULL;
           }
 
           // force implicit conversion to A string
           node_get_stringA(pn);
+          node_assert( pn->psAValue != NULL );
 
           /** fallthrough **/
 	case NODE_STRINGA:
-		if( pn->psWValue == NULL )
-			pn->psWValue = AToW( pn->pArena, pn->psAValue );
-
-		return pn->psWValue;
+          if( pn->psWValue == NULL ) {
+            pn->psWValue = AToW( pn->pArena, pn->psAValue );
+            node_assert( pn->psWValue != NULL );
+          }
+          
+          return pn->psWValue;
 
 	case NODE_STRINGW:
-		return pn->psWValue;
+          return pn->psWValue;
 
 	default:	/* invalid */
 		node_assert(!"Node cannot be converted to string"); /* invalid node type: fail gracefully by returning empty string */
@@ -4156,25 +4160,14 @@ static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
 static wchar_t * AToW( node_arena * pArena, const char * psA, size_t nLength )
 {
 	wchar_t * psW = NULL;
-        char * psWc = NULL;
-	wchar_t * psWStart = NULL;
         size_t nOut;
-
-        iconv_t cd = iconv_open("UTF-8", "UTF-16");
 
         nOut = nLength+2;
         psW = (wchar_t *)node_malloc(pArena, sizeof(wchar_t)*nOut);
-        psWc = (char *)psW;
-        psWStart = psW;
 
-        size_t nResult = iconv(cd, (char**)&psA, &nLength, &psWc, &nOut);
-        if (nResult == (size_t)(-1)) {
-          node_error("AToW conversion error");
-        }
-        psW = (wchar_t *)psWc;
-        *psW = (wchar_t)0;
+        size_t nResult = mbstowcs(psW, psA, nOut);
 
-        return psWStart;
+        return psW;
 }
 
 static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
@@ -4182,6 +4175,7 @@ static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
   char * psA = NULL;
   char * psAStart = NULL;
         size_t nOut;
+        size_t nBytesIn;
 
         iconv_t cd = iconv_open("UTF-16", "UTF-8");
 
@@ -4189,7 +4183,8 @@ static char * WToA( node_arena * pArena, const wchar_t * psW, size_t cch )
         psA = (char *)node_malloc(pArena, sizeof(char)*nOut);
         psAStart = psA;
 
-        size_t nResult = iconv(cd, (char**)&psW, &cch, &psA, &nOut);
+        nBytesIn = cch * sizeof(wchar_t);
+        size_t nResult = iconv(cd, (char**)&psW, &nBytesIn, &psA, &nOut);
         if (nResult == (size_t)(-1)) {
           node_error("WToA conversion error");
         }

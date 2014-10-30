@@ -7,6 +7,9 @@
 #define NODE_TRANSPARENT
 #include "../node.h"
 
+#include <iconv.h>
+#include <errno.h>
+
 TEST_CASE( "tests run", "[meta]" ) {
   REQUIRE( 1 == 1 );
 }
@@ -20,10 +23,23 @@ int node_memory( size_t /*cb*/ ) {
   return NODE_MEMORY_FAIL;
 }
 
+class node_exception : public std::exception {
+public:
+  char * reason;
+  node_exception(const char * s) :reason(strdup(s)) {}
+  ~node_exception() throw() { free(reason); } 
+
+  const char * what() const throw() {
+    return reason;
+  }
+};
+
 void node_assert( const char * psExpr, const char * psFile, unsigned int nLine ) {
   char acBuffer[1024] = {0};
 
   sprintf( acBuffer, "Node assertion failed: %s at %s:%d", psExpr, psFile, nLine );
+
+  throw(node_exception(acBuffer));
 }
 
 
@@ -331,4 +347,70 @@ TEST_CASE("basic node - alloc", "[basic][alloc]" ) {
      }
 
      node_free( pn );
+}
+
+TEST_CASE("iconv", "[iconv]") {
+  iconv_t cd = iconv_open("UTF-8", "UTF-16");
+
+  wchar_t awBuffer[16] = {0};
+  char acBuffer[16] = "3";
+  size_t nC = 2;
+  size_t nRoom = 16;
+
+  char * pc = acBuffer;
+  wchar_t * pw = awBuffer;
+
+  errno = 0;
+  //  size_t nResult = iconv(cd, &pc, &nC, (char**)&pw, &nRoom);
+
+  mbstowcs(pw, pc, 3);
+
+  REQUIRE(errno == 0);
+  //  REQUIRE(nResult == 0);
+  REQUIRE(awBuffer[0] == '3');
+  REQUIRE(awBuffer[1] == 0);
+  REQUIRE(std::wstring(awBuffer) == std::wstring(L"3"));
+}
+
+TEST_CASE("basic node - convert", "[basic][convert]" ) {
+
+     data_t ad[TEST_DATA_SIZE];
+
+     for(size_t i = 0; i < TEST_DATA_SIZE; i += 1) {
+          ad[i] = i;
+     }
+
+     node_t * pn = node_alloc();
+
+     SECTION("int to real") {
+       node_set(pn, NODE_INT, 3);
+       REQUIRE( node_get_real(pn) == 3.0 );
+     }
+
+     SECTION("int to stringA") {
+       node_set(pn, NODE_INT, 3);
+       REQUIRE( std::string(node_get_stringA(pn)) == std::string("3") );
+
+       node_set(pn, NODE_INT, 4);
+       REQUIRE( std::string(node_get_stringA(pn)) == std::string("4") );
+
+       /* second time to get coverage when value already set */
+       REQUIRE( std::string(node_get_stringA(pn)) == std::string("4") );
+     }
+     
+     SECTION("int to stringW") {
+       node_set(pn, NODE_INT, 3);
+       const wchar_t * pW = node_get_stringW(pn);
+       REQUIRE( pW != NULL );
+       REQUIRE( std::wstring(pW) == std::wstring(L"3") );
+
+       node_set(pn, NODE_INT, 4);
+       REQUIRE( std::wstring(node_get_stringW(pn)) == std::wstring(L"4") );
+
+       /* second time to get coverage when value already set */
+       REQUIRE( std::wstring(node_get_stringW(pn)) == std::wstring(L"4") );
+     }
+
+     node_free(pn);
+
 }
