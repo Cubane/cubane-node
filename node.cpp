@@ -116,31 +116,6 @@ int IsTextUnicode( const void * pv, int nLength, int * iFlags) {
 
 #endif
 
-/* Malloc specials */
-#ifdef USE_DL_MALLOC
-extern "C" extern struct malloc_state _gm_;
-
-struct node_arena
-{
-	struct va
-	{
-		va( va * p ) : next(p) {}
-		va * next;
-	};
-
-	mspace pSpace;
-	node_t * pnFreeList;
-	node_mutex csFreeList;
-	va * pVA;
-};
-
-struct node_arena g_GlobalArena = { &_gm_, NULL, {0}, 0 };
-
-static void inline nfree( node_arena * pArena, void * pv )
-{
-	mspace_free( pArena->pSpace, pv );
-}
-#else
 struct node_arena
 {
 	int nDummy;
@@ -151,7 +126,6 @@ static void inline nfree( node_arena * , void * pv )
 {
 	free( pv );
 }
-#endif
 
 /*************************************
  Debug/Release adjustments to #defines
@@ -559,10 +533,6 @@ static void hash_rebalance( node_t * pnHash, int nNewBuckets );
 #define NODE_STRING_ASCII		2
 #define NODE_STRING_UNICODE		3
 
-#ifdef USE_DL_MALLOC
-static void * node_valloc( node_arena * pArena, size_t nSize );
-#endif
-
 void * node_malloc( struct node_arena * pArena, size_t cb );
 
 /***********************************************
@@ -655,50 +625,6 @@ static node_t * node_alloc_internal( node_arena * pArena )
 {
 	node_t * pnNew = NULL;
 
-#ifdef USE_DL_MALLOC
-	{
-		node_lock l( &pArena->csFreeList );
-		if( pArena->pnFreeList != NULL )
-		{
-			pnNew = pArena->pnFreeList;
-			pArena->pnFreeList = pnNew->pnNext;
-		}
-
-		if( pnNew == NULL )
-		{
-			/* allocate some more space */
-
-#ifdef USE_BAGS
-			const size_t nNodeSize = NODE_SIZE + BAG_SIZE;
-#else
-			const size_t nNodeSize = NODE_SIZE;
-#endif
-			/* reserve 16 bytes for dlmalloc page overhead */
-			const size_t nArenaSize = 65536;
-			const size_t nCount = (nArenaSize-sizeof(node_arena::va))/ nNodeSize;
-
-			char * pcArena = reinterpret_cast<char*>(node_valloc( pArena, nArenaSize ) );
-
-			/* build freelist */
-			node_t * pnLast = reinterpret_cast<node_t*>( pcArena + (nCount-1) * nNodeSize );
-			pnLast->pnNext = pArena->pnFreeList;
-
-			
-			for( unsigned int i = nCount-2; i > 0; --i )
-			{
-				node_t * pn = reinterpret_cast<node_t*>( pcArena + i * nNodeSize );
-				pn->pnNext = pnLast;
-				pnLast = pn;
-			}
-
-			pArena->pnFreeList = pnLast;
-
-			pnNew = reinterpret_cast<node_t*>(pcArena);
-
-		}
-	}
-#endif /* USE_DL_MALLOC */
-
 	// BAG_SIZE == 0 if not USE_BAGS, so below is OK
 	if( pnNew == NULL )
 		pnNew = reinterpret_cast<node_t *>(node_malloc( pArena, NODE_SIZE + BAG_SIZE ));
@@ -742,15 +668,8 @@ static void node_free_internal( node_t * pn, unsigned int bInCollection )
 		/* free and NULL all members of pn (type specific) */
 		node_cleanup( pn );
 
-#ifdef USE_DL_MALLOC
-		{
-			node_lock l(&pArena->csFreeList );
-			pn->pnNext = pArena->pnFreeList;
-			pArena->pnFreeList = pn;
-		}
-#else
 		nfree( pArena, pn );
-#endif
+
 		pn = pnSaved;
 
 	} /* while (pn is not null) */
@@ -4354,23 +4273,12 @@ static int node_memory( size_t cb )
 		return node_pfMemory( cb );
 }
 
-#ifdef USE_DL_MALLOC
-void * node_malloc( struct node_arena * pArena, size_t cb )
-#else
 void * node_malloc( struct node_arena * , size_t cb )
-#endif
 {
 	int nRetry = 0;
 
 RETRY:
 	void * pv = NULL;
-
-#if defined(USE_DL_MALLOC) || defined(DEBUG_DL_MALLOC)
-	/* round up to multiple of 4 */
-	cb = (cb + 3) & (~3);
-
-	pv = mspace_malloc( pArena->pSpace, cb );
-#else
 
 #if defined(_DEBUG) && defined(_MSC_VER)
 	if( node_source_file == NULL )
@@ -4379,8 +4287,6 @@ RETRY:
 		pv = _malloc_dbg( cb, _NORMAL_BLOCK, node_source_file, node_source_line );
 #else
 	pv = malloc( cb );
-#endif
-
 #endif
 
 	if( pv == NULL ) 
@@ -4393,32 +4299,6 @@ RETRY:
 
 	return pv;
 }
-
-#if defined(USE_DL_MALLOC)
-static void * node_valloc( struct node_arena * pArena, size_t nSize )
-{
-	int nRetry = 0;
-
-RETRY:
-	void * pv = VirtualAlloc( NULL, nSize, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE );
-
-	if( pv == NULL ) 
-	{
-		if( node_memory( nSize ) == NODE_MEMORY_RETRY && nRetry++ < 10 )
-			goto RETRY;
-		else
-			exit(1);
-	}
-
-	// stash a pointer on the arena so we can clean it later
-	node_arena::va * pVA = (node_arena::va *)pv;
-	pVA->next = pArena->pVA;
-	pArena->pVA = pVA;
-
-	return (char * )pv + sizeof(node_arena::va);
-
-}
-#endif
 
 static int __inline hash_to_bucket( const node_t * pnHash, int nHash )
 {
@@ -4438,68 +4318,6 @@ void freelist_cleanup()
 }
 
 
-#ifdef USE_DL_MALLOC
-node_arena_t node_create_arena( size_t size )
-{
-	/* create a new arena and don't select it */
-	
-	/* alloc from global arena so we can't be F'ed up by being destroyed along with some other arena... */
-	node_arena * pNewArena = (node_arena *)node_malloc( &g_GlobalArena, sizeof(node_arena) );
-
-	pNewArena->pSpace = create_mspace( size, 0 );
-	pNewArena->pnFreeList = NULL;
-	InitializeCriticalSection( &(pNewArena->csFreeList) );
-	pNewArena->pVA = NULL;
-
-	return (node_arena_t)pNewArena;
-}
-
-node_arena_t node_get_arena()
-{
-	return (node_arena_t)node_pArena;
-}
-
-node_arena_t node_set_arena( node_arena_t pNewArena )
-{
-	node_arena * pOld = node_pArena;
-
-	node_pArena = (node_arena *)pNewArena;
-
-	return (node_arena_t)pOld;
-}
-
-size_t node_delete_arena( node_arena_t pToDelete )
-{
-	node_arena * pArena = (node_arena *)pToDelete;
-	if( pArena == &g_GlobalArena )
-	{
-		node_error( "Error! Attempting to delete global arena!\n" );
-		return 0;
-	}
-
-	if( pArena == node_pArena )
-	{
-		/* deleting current arena - set current to global */
-		pArena = &g_GlobalArena;
-		/* other threads might have as current the arena we are about to delete.  If so, too bad! */
-	}
-
-	/* free the vas */
-	node_arena::va * pVANext;
-	for( node_arena::va * pVA = pArena->pVA; pVA != NULL; pVA = pVANext )
-	{
-		pVANext = pVA->next;
-		VirtualFree( pVA, 0, MEM_RELEASE );
-	}
-
-	size_t result = destroy_mspace( pArena->pSpace );
-	pArena->pnFreeList = NULL;
-	DeleteCriticalSection( &(pArena->csFreeList) );
-	nfree( &g_GlobalArena, pArena );
-
-	return result;
-}
-#else
 node_arena_t node_create_arena( size_t )
 {
 	return NULL;
@@ -4519,7 +4337,6 @@ size_t node_delete_arena( node_arena_t  )
 {
 	return 0;
 }
-#endif
 
 
 
@@ -4534,9 +4351,6 @@ public:
 
 //		FreeLibrary( hKernel );
 
-#ifdef USE_DL_MALLOC
-		InitializeCriticalSection( &(g_GlobalArena.csFreeList) );
-#endif
 //		_CrtSetBreakAlloc( 1380 );
 
 		node_tls_alloc();
@@ -4544,10 +4358,6 @@ public:
 
 	~LibSetup()
 	{
-#ifdef USE_DL_MALLOC
-		DeleteCriticalSection( &(g_GlobalArena.csFreeList) );
-		memset( &(g_GlobalArena.csFreeList), 0, sizeof(g_GlobalArena.csFreeList) );
-#endif
 
                 node_tls_free();
 	}
