@@ -177,7 +177,8 @@ TEST_CASE("regression - W parser", "[regression][parse][7552]" ) {
 
 #define TS_ASSERT REQUIRE
 #define TS_ASSERT_EQUALS(a,b)   REQUIRE( (a) == (b) )
-
+#define TS_ASSERT_SAME_DATA(a,b,l)  REQUIRE( memcmp((a),(b),(l)) == 0 )
+#define TS_ASSERT_THROWS_ANYTHING(a)  REQUIRE_THROWS(a)
   
 TEST_CASE("regression 8400 - A parser", "[regression][parse][8400]" ) {
      node_t * pn = NULL;
@@ -225,8 +226,31 @@ TEST_CASE("regression 8400 - W parser", "[regression][parse][8400]" ) {
      fclose( pf );
 }
 
+     const size_t TEST_DATA_SIZE = 17;
+
+     void checkData( node_t * pn, data_t * ad, size_t nLengthIn, const char * sMessage ) {
+          int nLengthOut;
+          const data_t * pd = NULL;
+
+          REQUIRE( nLengthIn <= TEST_DATA_SIZE );
+
+          node_set_data(pn, nLengthIn, ad);
+          pd = node_get_data(pn, &nLengthOut);
+
+          REQUIRE(nLengthOut == nLengthIn);
+          REQUIRE( memcmp(ad, pd, nLengthOut) == 0);
+     }
+
+
   
 TEST_CASE("basic node - alloc", "[basic][alloc]" ) {
+
+     data_t ad[TEST_DATA_SIZE];
+          
+     for(size_t i = 0; i < TEST_DATA_SIZE; i += 1) {
+          ad[i] = i;
+     }
+
      node_t * pn = node_alloc();
 
      SECTION("can set int") {
@@ -263,6 +287,47 @@ TEST_CASE("basic node - alloc", "[basic][alloc]" ) {
 
           node_set(pn, NODE_STRINGW, node_get_stringW(pn));
           REQUIRE(std::wstring(node_get_stringW(pn)) == std::wstring(L"Three"));
+     }
+
+     SECTION("can set data to 1 byte") {
+          checkData(pn, ad, 1u, "1 byte");
+     }
+     
+     SECTION("can set data to 8 bytes") {
+          checkData(pn, ad, 8u, "8 bytes");
+     }
+     
+     SECTION("can set data to 15 bytes") {
+          checkData(pn, ad, 15u, "15 bytes");
+     }
+     
+     SECTION("can set data to 16 bytes") {
+          checkData(pn, ad, 16u, "16 bytes");
+     }
+     
+     SECTION("can set data to 17 bytes") {
+          checkData(pn, ad, 17u, "17 bytes");
+     }
+     
+     SECTION("test data size change: grow") {
+		int nLengthOut;
+		const data_t * pd = NULL;
+		int nLengthIn = 17;
+
+		node_set_data( pn, nLengthIn, ad );
+		pd = node_get_data( pn, &nLengthOut );
+
+		TS_ASSERT_EQUALS( nLengthOut, nLengthIn );
+		TS_ASSERT_SAME_DATA( ad, pd, nLengthOut );
+
+		nLengthIn = 15;
+		node_set_data( pn, nLengthIn, pd );
+		pd = node_get_data( pn, &nLengthOut );
+		TS_ASSERT_EQUALS( nLengthOut, nLengthIn );
+		TS_ASSERT_SAME_DATA( ad, pd, nLengthOut );
+
+		nLengthIn = 17;
+		TS_ASSERT_THROWS_ANYTHING( node_set_data( pn, nLengthIn, pd ) );
      }
      
      node_free( pn );
