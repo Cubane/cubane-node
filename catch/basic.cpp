@@ -55,7 +55,11 @@ TEST_CASE("report version", "[meta][version]" ) {
 TEST_CASE("check size", "[meta][size]" ) {
   size_t nSize = sizeof(struct __node);
 
+#if defined(_WIN64) || defined(__LP64__)
   REQUIRE( nSize == 64 );
+#else 
+  REQUIRE( nSize == 48 );
+#endif
 }
 
 TEST_CASE("regression - name is brace", "[regression][parse]" ) {
@@ -63,8 +67,13 @@ TEST_CASE("regression - name is brace", "[regression][parse]" ) {
   const char * psExpected = "%7D: \'foo\'\r\n";
 
   pn = node_alloc();
+
+  REQUIRE(pn->psWValue == NULL);
+
   node_set(pn, NODE_STRINGA, "foo");
   node_set_nameA( pn, "}" );
+
+  REQUIRE(pn->psWValue == NULL);
 
   FILE * pf = fopen(g_psFileName, "wb");
   node_dumpA( pn, pf, 0 );
@@ -77,5 +86,17 @@ TEST_CASE("regression - name is brace", "[regression][parse]" ) {
 
   REQUIRE( strncmp( psExpected, acBuffer, 12 ) == 0 );
 
+  REQUIRE(pn->psWValue == NULL);
+  node_free(pn);
+
+  pf = fopen( g_psFileName, "rb" );
+  int nResult = node_parseA( pf, &pn );
+  fclose(pf);
+
+  REQUIRE(nResult == NP_NODE);
+  REQUIRE(std::string("}") == node_get_nameA(pn));
+  REQUIRE(std::string("foo") == node_get_stringA(pn));
+
+  REQUIRE(pn->psWValue == NULL);
   node_free(pn);
 }

@@ -36,7 +36,7 @@
 // needs to be defined at project level to affect all files -- set in DSP file
 
 /* optional: small speed improvement when hashes used frequently */
-//#define USE_BAGS					/* allocate extra space after node for (small) string storage instead of using free store */
+#define USE_BAGS					/* allocate extra space after node for (small) string storage instead of using free store */
 
 /***********************************
  Error checking on above definitions
@@ -402,7 +402,7 @@ static inline void byte_to_strA( char *& ps, unsigned int b )
 #define HASH_CONTAINS_AKEYS		0x01
 #define HASH_CONTAINS_WKEYS		0x02
 
-#if _WIN64 
+#if defined(_WIN64) || defined(__LP64__)
 #define NODE_SIZE		64		/* not sizeof(node_t), which is 64 */
 #else 
 #define NODE_SIZE		48		/* not sizeof(node_t), which is 48 */
@@ -410,7 +410,7 @@ static inline void byte_to_strA( char *& ps, unsigned int b )
 
 
 #ifdef USE_BAGS
-#if _WIN64 
+#if defined(_WIN64) || defined(__LP64__)
 #define BAG_SIZE		64
 #else 
 #define BAG_SIZE		32
